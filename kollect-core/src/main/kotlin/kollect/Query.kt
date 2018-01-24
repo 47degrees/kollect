@@ -4,19 +4,22 @@ import arrow.core.*
 import arrow.deriving
 import arrow.higherkind
 import arrow.typeclasses.Applicative
+import arrow.typeclasses.Functor
 import java.time.Duration
 
-val Infinite = Duration.ofDays(Long.MAX_VALUE)
+val Infinite: Duration = Duration.ofDays(Long.MAX_VALUE)
 
 typealias QueryCallback<A> = (A) -> Unit
 typealias QueryErrorback = (Throwable) -> Unit
 
 @higherkind
-@deriving(Applicative::class)
+@deriving(Functor::class, Applicative::class)
 sealed class Query<A> : QueryKind<A> {
 
     fun <B> ap(ff: QueryKind<(A) -> B>): Query<B> =
         Ap(this, ff.ev())
+
+    fun <B> map(f: (A) -> B): Query<B> = ap(pure(f))
 
     companion object {
 
