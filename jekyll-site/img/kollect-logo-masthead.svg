@@ -1,0 +1,78 @@
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="265" height="245" viewBox="0 0 265 245">
+  <defs>
+    <linearGradient id="kollect-logo-masthead-a" x1="7.419%" x2="68.265%" y1="96.693%" y2="17.644%">
+      <stop offset="0%" stop-color="#876CFF"/>
+      <stop offset="16.94%" stop-color="#8B69FF"/>
+      <stop offset="100%" stop-color="#9F5BFF"/>
+    </linearGradient>
+    <linearGradient id="kollect-logo-masthead-b" x1="73.869%" x2="0%" y1="19.472%" y2="68.172%">
+      <stop offset="0%" stop-color="#4B1F7D"/>
+      <stop offset="100%" stop-color="#3F1F7D"/>
+    </linearGradient>
+    <linearGradient id="kollect-logo-masthead-e" x1="0%" x2="84.506%" y1="26.809%" y2="85.865%">
+      <stop offset="0%" stop-color="#876CFF"/>
+      <stop offset="100%" stop-color="#9F5BFF"/>
+    </linearGradient>
+    <polygon id="kollect-logo-masthead-d" points="131.192 112.628 156.192 81.128 264.364 125.916 246.028 134.096"/>
+    <filter id="kollect-logo-masthead-c" width="106%" height="130.2%" x="-3%" y="-7.6%" filterUnits="objectBoundingBox">
+      <feOffset dy="8" in="SourceAlpha" result="shadowOffsetOuter1"/>
+      <feColorMatrix in="shadowOffsetOuter1" values="0 0 0 0 0.105882353   0 0 0 0 0.0274509804   0 0 0 0 0.325490196  0 0 0 0.0671988225 0"/>
+    </filter>
+    <linearGradient id="kollect-logo-masthead-f" x1="73.869%" x2="0%" y1="19.472%" y2="68.172%">
+      <stop offset="0%" stop-color="#512486"/>
+      <stop offset="100%" stop-color="#452486"/>
+    </linearGradient>
+    <linearGradient id="kollect-logo-masthead-g" x1="73.869%" x2="0%" y1="19.472%" y2="68.172%">
+      <stop offset="0%" stop-color="#974BC4"/>
+      <stop offset="100%" stop-color="#694BC4"/>
+    </linearGradient>
+    <linearGradient id="kollect-logo-masthead-h" x1="73.869%" x2="0%" y1="19.472%" y2="68.172%">
+      <stop offset="0%" stop-color="#7532B1"/>
+      <stop offset="100%" stop-color="#5B29A0"/>
+    </linearGradient>
+    <linearGradient id="kollect-logo-masthead-i" x1="73.869%" x2="0%" y1="19.472%" y2="68.172%">
+      <stop offset="0%" stop-color="#642D95"/>
+      <stop offset="100%" stop-color="#582D95"/>
+    </linearGradient>
+    <linearGradient id="kollect-logo-masthead-l" x1="0%" x2="84.506%" y1="26.809%" y2="85.865%">
+      <stop offset="0%" stop-color="#876CFF"/>
+      <stop offset="100%" stop-color="#7123E0"/>
+    </linearGradient>
+    <polygon id="kollect-logo-masthead-k" points="156.192 81.128 196.052 124.752 196.052 97.632"/>
+    <filter id="kollect-logo-masthead-j" width="120.1%" height="136.7%" y="-9.2%" filterUnits="objectBoundingBox">
+      <feOffset dy="8" in="SourceAlpha" result="shadowOffsetOuter1"/>
+      <feColorMatrix in="shadowOffsetOuter1" values="0 0 0 0 0.105882353   0 0 0 0 0.0274509804   0 0 0 0 0.325490196  0 0 0 0.1 0"/>
+    </filter>
+    <linearGradient id="kollect-logo-masthead-m" x1="100%" x2="10.593%" y1="33.322%" y2="71.217%">
+      <stop offset="0%" stop-color="#714BB2"/>
+      <stop offset="100%" stop-color="#5911B2"/>
+    </linearGradient>
+    <polygon id="kollect-logo-masthead-o" points="90.442 123.878 70.046 151.29 87.334 162.118"/>
+    <filter id="kollect-logo-masthead-n" width="139.2%" height="141.8%" x="-19.6%" y="-10.5%" filterUnits="objectBoundingBox">
+      <feOffset dy="8" in="SourceAlpha" result="shadowOffsetOuter1"/>
+      <feColorMatrix in="shadowOffsetOuter1" values="0 0 0 0 0.105882353   0 0 0 0 0.0274509804   0 0 0 0 0.325490196  0 0 0 0.1 0"/>
+    </filter>
+    <linearGradient id="kollect-logo-masthead-p" x1="73.869%" x2="0%" y1="19.472%" y2="68.172%">
+      <stop offset="0%" stop-color="#9C53D0"/>
+      <stop offset="100%" stop-color="#6E53D0"/>
+    </linearGradient>
+  </defs>
+  <g fill="none" fill-rule="evenodd">
+    <polygon fill="url(#kollect-logo-masthead-a)" points="23.664 233.953 131.192 112.629 90.44 123.877 .864 244.249"/>
+    <polygon fill="url(#kollect-logo-masthead-b)" points="131.192 112.628 49.676 204.6 196.011 124.724"/>
+    <use fill="#000" filter="url(#kollect-logo-masthead-c)" xlink:href="#kollect-logo-masthead-d"/>
+    <use fill="url(#kollect-logo-masthead-e)" xlink:href="#kollect-logo-masthead-d"/>
+    <polygon fill="url(#kollect-logo-masthead-f)" points="156.192 81.128 163.028 71.876 196.052 50.404 196.052 97.632"/>
+    <polygon fill="url(#kollect-logo-masthead-g)" points="231.453 26.828 203.033 45.62 203.033 10.524 231.453 5.844"/>
+    <polygon fill="url(#kollect-logo-masthead-h)" points="203.532 .683 203.532 45.619 192.444 52.719 162.76 6.063"/>
+    <polygon fill="url(#kollect-logo-masthead-i)" points="231.953 5.843 231.953 13.591 225.261 6.943"/>
+    <use fill="#000" filter="url(#kollect-logo-masthead-j)" xlink:href="#kollect-logo-masthead-k"/>
+    <use fill="url(#kollect-logo-masthead-l)" xlink:href="#kollect-logo-masthead-k"/>
+    <polygon fill="url(#kollect-logo-masthead-m)" points="90.442 123.878 45.126 135.678 70.046 151.29"/>
+    <g>
+      <use fill="#000" filter="url(#kollect-logo-masthead-n)" xlink:href="#kollect-logo-masthead-o"/>
+      <use fill="url(#kollect-logo-masthead-l)" xlink:href="#kollect-logo-masthead-o"/>
+    </g>
+    <polygon fill="url(#kollect-logo-masthead-p)" points="162.758 6.062 140.23 32.874 140.23 71.878 163.026 71.878 192.442 52.718"/>
+  </g>
+</svg>
