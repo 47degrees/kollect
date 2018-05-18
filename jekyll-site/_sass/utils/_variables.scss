@@ -9,14 +9,14 @@
 
 
 // Colors
-$brand-primary: rgb(175, 127, 251);
-$brand-secondary: rgb(148, 46, 196);
-$brand-tertiary: rgb(111, 30, 189);
+$brand-primary: rgb(156, 94, 255);
+$brand-secondary: rgb(138, 29, 189);
+$brand-tertiary: rgb(111, 29, 189);
 $gray-primary: rgb(34, 10, 89);
 $gray-secondary: rgba($gray-primary, 0.88);
 $white: rgb(255, 255, 255);
-$link-color: darken($brand-primary, 10%);
-$link-hover: darken($brand-primary, 15%);
+$link-color: darken($brand-secondary, 10%);
+$link-hover: darken($brand-secondary, 15%);
 
 // Typography
 $base-font-family: 'Open Sans', sans-serif;

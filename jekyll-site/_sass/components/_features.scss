@@ -10,7 +10,7 @@
     }
     background: $white;
     .feature-item {
-        margin-top: ($base-point-grid * 5);
+        margin-top: ($base-point-grid * 7);
         text-align: center;
         h2 {
             margin: {
@@ -19,7 +19,7 @@
                 bottom: ($base-point-grid * 2);
                 /*16px*/
             }
-            font-size: 1.25rem;
+            font-size: 1.5rem;
         }
         
         p {

@@ -3,13 +3,14 @@
 // -----------------------------------------------
 #masthead {
     position: relative;
-    padding: ($base-point-grid * 14) 0;/*176px*/
-    ; //background: url("../img/ank-background-masthead.svg") top right no-repeat;
+    padding: ($base-point-grid * 14) 0;//*176px*;
+    //background: url("../img/background.svg") bottom center no-repeat;
     background-color: $gray-primary;
-    //background-image: url("../img/ank-background-masthead.svg"), url("../img/ank-background-masthead-top.svg");
-    //background-position: right bottom, left top;
-    //background-repeat: no-repeat, no-repeat;
+    background-image: url("../img/masthead-bottom.svg"), url("../img/masthead-mountain-small.svg"), url("../img/masthead-mountain-medium.svg"), url("../img/masthead-mountain-large.svg"), url("../img/masthead-tree-large.svg"), url("../img/masthead-tree-small.svg"), url("../img/masthead-bank.svg"), url("../img/masthead-lines.svg");
+    background-position: center bottom;
+    background-repeat: repeat-x, no-repeat, no-repeat, no-repeat, no-repeat, no-repeat, no-repeat;
     text-align: center;
+    animation: koll 2s ease-out;
 
 
     .masthead-title {
@@ -31,7 +32,6 @@
 // Responsive mode
 @include bp(medium) {
     #masthead {
-        background-position: 0 bottom, left top;
         .masthead-title {
             padding: 0 ($base-point-grid * 3);
             font-size: 2rem;
@@ -49,4 +49,10 @@
             margin-top: ($base-point-grid * 8);
         }
     }
+}
+
+
+@keyframes koll {
+    from { background-position: center 200, center 700, center 800, center 900, center 600, center 350, center 550, center 420;  }
+    to {background-position: center bottom; }
 }

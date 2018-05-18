@@ -17,7 +17,7 @@
         @include justify-content(space-between);
         @include align-items(center);
         padding: ($base-point-grid * 2) ($base-point-grid * 3);
-        background: rgba($white, 0.08);
+        background: rgba($white, 0.04);
     }
     .sidebar-nav {
         margin-top: ($base-point-grid * 2);
@@ -44,7 +44,7 @@
                 a {
                     padding-left: (($base-point-grid * 3) - 3);
                     background: rgba($white, 0.08);
-                    border-left: 3px solid $brand-primary;
+                    border-left: 3px solid $brand-secondary;
                     pointer-events: none;
                 }
 

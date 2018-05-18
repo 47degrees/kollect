@@ -3,7 +3,7 @@
 // -----------------------------------------------
 .button {
     display: inline-block;
-    background: $brand-primary;
+    background: $brand-secondary;
     color: $white;
     text-decoration: none;
     text-transform: uppercase;
@@ -14,11 +14,11 @@
     }
     &:hover {
         color: $white;
-        background: darken($brand-primary, 15%);
+        background: darken($brand-secondary, 10%);
         text-decoration: none;
     }
     &:active {
-        background: darken($brand-primary, 20%);
+        background: darken($brand-secondary, 10%);
     }
 
     &.button-large {

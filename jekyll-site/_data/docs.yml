@@ -1,18 +1,18 @@
 content:
-    - title: Compile
+    - title: Batching
       description: Lorem ip amet, consectetur adipiscing elit. Nullam blandit odio nec button amet, consectetur adip.
       icon: /img/feature-icon-primary.svg
       cta: learn more
-      url: /docs/compile/
+      url: /docs/batching/
 
-    - title: Evaluation
+    - title: Parallelism
       description: Lorem ip amet, consectetur adipiscing elit. Nullam blandit odio nec button amet, consectetur adip.
       icon: /img/feature-icon-secondary.svg
-      url: /docs/evaluation/
+      url: /docs/parallelism/
 
-    - title: Verification
+    - title: Caching
       description: Lorem ip amet, consectetur adipiscing elit. Nullam blandit odio nec button amet, consectetur adip.
       icon: /img/feature-icon-tertiary.svg
-      url: /docs/verification/
+      url: /docs/caching/
           
 cta: learn more

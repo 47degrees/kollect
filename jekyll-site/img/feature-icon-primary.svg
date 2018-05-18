@@ -1,7 +1,18 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="87" height="87" viewBox="0 0 87 87">
+<svg xmlns="http://www.w3.org/2000/svg" width="88" height="88" viewBox="0 0 88 88">
+  <defs>
+    <linearGradient id="feature-icon-primary-a" x1="19.781%" x2="81.948%" y1="17.754%" y2="84.065%">
+      <stop offset="0%" stop-color="#6F1DBD"/>
+      <stop offset="100%" stop-color="#A772D9"/>
+    </linearGradient>
+  </defs>
   <g fill="none" fill-rule="evenodd">
-    <polygon fill="#FC3" points="43 17 76 76 10 76"/>
-    <polygon fill="#FFA814" points="43 5 86 82 43 82" opacity=".5" transform="rotate(17 64.5 43.5)"/>
-    <path fill="#FFF" fill-rule="nonzero" d="M36.4230538,61.443589 L34.3017334,63.5649093 L27.0675175,56.3306934 L34.2674648,49.1307461 L36.3887852,51.2520664 L31.3101582,56.3306934 L36.4230538,61.443589 Z M45.7894375,50.8824375 L47.9107578,48.7611172 L55.1221262,55.9724855 L47.5904308,63.5041809 L45.4691105,61.3828605 L50.8794855,55.9724855 L45.7894375,50.8824375 Z M42.3444211,46.5326554 L45.2180789,47.3941024 L39.5916141,66.1631453 L36.7179563,65.3016984 L42.3444211,46.5326554 Z"/>
+    <polygon fill="url(#feature-icon-primary-a)" points="3 15.977 3 62.658 44.219 86 85.438 62.658" opacity=".2"/>
+    <polygon fill="#6F1DBD" points="43.783 3.488 12 21.365 12 57.121 43.783 75 75.566 57.121 75.566 21.368"/>
+    <rect width="24" height="2" x="31" y="29" fill="#FFF"/>
+    <polygon fill="#FFF" stroke="#FFF" points="56 30 53 32 53 28"/>
+    <polygon fill="#FFF" stroke="#FFF" points="50 39 47 41 47 37"/>
+    <polygon fill="#FFF" stroke="#FFF" points="56 48 53 50 53 46"/>
+    <rect width="18" height="2" x="31" y="38" fill="#FFF"/>
+    <rect width="23" height="1" x="31.5" y="47.5" fill="#D8D8D8" stroke="#FFF"/>
   </g>
 </svg>

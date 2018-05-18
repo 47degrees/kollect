@@ -14,9 +14,12 @@
     z-index: 2;
     .navigation-brand {
         font-family: $header-font-family;
+        font-size: 1.625rem;
         a {
             color: $white;
+             text-decoration: none; 
         }
+            
     }
     .navigation-menu {
 
