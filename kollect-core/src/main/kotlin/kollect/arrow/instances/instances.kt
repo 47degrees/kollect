@@ -10,6 +10,6 @@ interface InMemoryCacheMonoidInstance : Semigroup<InMemoryCache>, Monoid<InMemor
 
     override fun empty(): InMemoryCache = InMemoryCache.empty()
 
-    override fun combine(a: InMemoryCache, b: InMemoryCache): InMemoryCache =
-        InMemoryCache(a.state.plus(b.state))
+    override fun InMemoryCache.combine(b: InMemoryCache): InMemoryCache =
+        InMemoryCache(this.state.plus(b.state))
 }

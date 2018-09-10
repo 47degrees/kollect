@@ -1,0 +1,15 @@
+#.instances: fill=#B9F6CA visual=class italic bold dashed
+#.typeclasses: fill=#64B5F6 visual=database bold
+#arrowSize: 1
+#bendSize: 0.3
+#fill: #64B5F6
+#font: Menlo
+#fontSize: 10
+#lineWidth: 2
+#padding: 8
+#zoom: 1
+[<typeclasses>Functor]<-[<typeclasses>Applicative]
+[<typeclasses>Semigroup]<-[<typeclasses>Monoid]
+[<typeclasses>Applicative]<-[<instances>Applicative Instances|KollectApplicativeInstance|KollectOpApplicativeInstance|QueryApplicativeInstance]
+[<typeclasses>Monoid]<-[<instances>Monoid Instances|InMemoryCacheMonoidInstance]
+[<typeclasses>Semigroup]<-[<instances>Semigroup Instances|InMemoryCacheMonoidInstance]

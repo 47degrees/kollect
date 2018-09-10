@@ -1,6 +1,11 @@
 package kollect
 
-import arrow.core.*
+import arrow.core.None
+import arrow.core.Option
+import arrow.core.Tuple2
+import arrow.core.fix
+import arrow.core.functor
+import arrow.core.toT
 import arrow.data.NonEmptyList
 import arrow.data.nel
 import kollect.arrow.extensions.tupleLeft
@@ -46,20 +51,20 @@ interface DataSource<I : Any, A> {
      */
     fun batchingNotSupported(ids: NonEmptyList<I>): Query<Map<I, A>> {
         val fetchOneWithId: (I) -> Query<Option<Tuple2<I, A>>> = { id ->
-            fetchOne(id).map { it.tupleLeft(id).fix() }
+            fetchOne(id).map { Option.functor().tupleLeft(it, id).fix() }
         }
 
-        return ids.traverse(fetchOneWithId, Query.applicative())
-                .fix()
-                .map {
-                    it.map { it.orNull() }.all
-                            .filterNotNull()
-                            .map { Pair(it.a, it.b) }.toMap()
-                }
+        return ids.traverse(Query.applicative(), fetchOneWithId)
+            .fix()
+            .map {
+                it.map { it.orNull() }.all
+                    .filterNotNull()
+                    .map { Pair(it.a, it.b) }.toMap()
+            }
     }
 
     fun batchingOnly(id: I): Query<Option<A>> =
-            fetchMany(id.nel()).map { Option.fromNullable(it[id]) }
+        fetchMany(id.nel()).map { Option.fromNullable(it[id]) }
 
     fun maxBatchSize(): Option<Int> = None
 
