@@ -20,7 +20,7 @@ Here we use to include all the relevant things implemented and also rationale, a
 
 ### 📱 How to Test
 
-Here we use to add the steps to manually test the PR. Here you have some sample checks:
+Here we use to add the steps to test the implemented changes. Here you have some sample checks:
 
 * Step 1
 * Step 2
