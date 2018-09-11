@@ -7,6 +7,8 @@ import arrow.data.foldLeft
 import arrow.effects.IO
 import arrow.effects.applicative
 import arrow.effects.fix
+import arrow.higherkind
+import arrow.typeclasses.Monad
 
 // Fetch queries
 interface KollectRequest
@@ -152,8 +154,15 @@ sealed class KollectResult<A> {
 }
 
 // Kollect data type
+@higherkind
 sealed class Kollect<A> {
     abstract val run: IO<KollectResult<A>>
 
     data class Unkollect<A>(override val run: IO<KollectResult<A>>) : Kollect<A>()
 }
+
+// Kollect ops
+/*
+object KollectMonad : Monad<ForKollect> {
+
+}*/

@@ -12,7 +12,7 @@ interface Env {
 /**
  * A data structure that holds information about a request inside a fetch round.
  */
-data class Request(val request: FetchRequest, val start: Long, val end: Long) {
+data class Request(val request: KollectRequest, val start: Long, val end: Long) {
     val duration: Long = end - start
 }
 
