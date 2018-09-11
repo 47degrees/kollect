@@ -7,6 +7,8 @@ import arrow.core.getOrElse
 import arrow.core.toOption
 import arrow.data.NonEmptyList
 import arrow.data.foldLeft
+import arrow.effects.DeferredK
+import arrow.effects.ForIO
 import arrow.effects.IO
 import arrow.effects.applicative
 import arrow.effects.fix
@@ -15,6 +17,8 @@ import arrow.higherkind
 import arrow.instance
 import arrow.typeclasses.Monad
 import arrow.typeclasses.binding
+import kollect.arrow.ContextShift
+import kotlinx.coroutines.experimental.Deferred
 
 // Kollect queries
 interface KollectRequest
@@ -165,6 +169,37 @@ sealed class Kollect<A> : KollectOf<A> {
     abstract val run: IO<KollectResult<A>>
 
     data class Unkollect<A>(override val run: IO<KollectResult<A>>) : Kollect<A>()
+
+    companion object {
+        /**
+         * Lift a plain value to the Kollect monad.
+         */
+        fun <A> pure(a: A): Kollect<A> = Unkollect(IO.just(KollectResult.Done(a)))
+
+        fun <A> exception(e: (Env) -> KollectException): Kollect<A> = Unkollect(IO.just(KollectResult.Throw(e)))
+
+        fun <A> error(e: Throwable): Kollect<A> = exception { env -> KollectException.UnhandledException(e, env) }
+
+        fun <I : Any, A> apply(CS: ContextShift<ForIO>, id: I, ds: DataSource<I, A>): Kollect<A> =
+            Unkollect(IO.monad().binding {
+                val deferred = DeferredK<ForIO, KollectStatus>()
+                /*request = FetchOne[I, A](id, ds)
+                result = deferred.complete _
+                    blocked = BlockedRequest(request, result)
+                anyDs = ds.asInstanceOf[DataSource[Any, Any]]
+                blockedRequest = RequestMap(Map(anyDs -> blocked))
+                for {
+
+                } yield Blocked(blockedRequest, Unfetch(
+                    deferred.get.flatMap(_ match {
+                        case FetchDone(a: A) =>
+                        IO.pure(Done(a))
+                        case FetchMissing() =>
+                        IO.pure(Throw((env) => MissingIdentity[I, A](id, request, env)))
+                    })
+                ))*/
+            })
+    }
 }
 
 // Kollect ops
