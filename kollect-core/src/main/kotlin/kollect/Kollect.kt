@@ -143,3 +143,17 @@ private fun <I : Any, A> combineRequestMaps(x: RequestMap, y: RequestMap): Reque
         val combinedReq: BlockedRequest = acc.get(tuple.key).toOption().fold({ tuple.value }, { combineRequests<I, A>(tuple.value, it) })
         acc.filterNot { it.key == tuple.key } + mapOf(tuple.key to combinedReq)
     })
+
+// `Kollect` result data type
+sealed class KollectResult<A> {
+    data class Done<A>(val x: A) : KollectResult<A>()
+    data class Blocked<A>(val rs: RequestMap, val cont: Kollect<A>) : KollectResult<A>()
+    data class Throw<A>(val e: (Env) -> FetchException) : KollectResult<A>()
+}
+
+// Kollect data type
+sealed class Kollect<A> {
+    abstract val run: IO<KollectResult<A>>
+
+    data class Unkollect<A>(override val run: IO<KollectResult<A>>) : Kollect<A>()
+}
