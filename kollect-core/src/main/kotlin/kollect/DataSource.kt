@@ -2,72 +2,141 @@ package kollect
 
 import arrow.core.None
 import arrow.core.Option
+import arrow.core.Some
 import arrow.core.Tuple2
 import arrow.core.fix
 import arrow.core.functor
-import arrow.core.toT
-import arrow.data.NonEmptyList
-import arrow.data.nel
+import arrow.effects.IO
+import arrow.effects.parallelMapN
 import kollect.arrow.extensions.tupleLeft
+import kotlinx.coroutines.experimental.CommonPool
 
-typealias DataSourceName = String
-typealias DataSourceIdentity = Tuple2<DataSourceName, Any>
+class TooMuchConcurrencyException : Exception("It's just supported to pass up to 9 ids for now.")
 
-sealed class ExecutionType
-object Sequential : ExecutionType()
-object Parallel : ExecutionType()
+sealed class BatchExecution
+object Sequentially : BatchExecution()
+object InParallel : BatchExecution()
 
 /**
- * A `DataSource` is the recipe for fetching a certain identity `I`, which yields
- * results of type `A`.
+ * Result `DataSource` is the recipe for fetching a certain identity `Identity`, which yields
+ * results of type `Result`.
  */
-interface DataSource<I : Any, A> {
+interface DataSource<Identity : Any, Result> {
 
     /**
-     * The name of the data source.
+     * Name given to the data source. It takes the string "KollectDataSource:${this.javaClass.simpleName}" as a default,
+     * but can be overriden.
      */
-    fun name(): DataSourceName
+    fun name(): String = "KollectDataSource:${this.javaClass.simpleName}"
 
     /**
-     * Derive a `DataSourceIdentity` from an identity, suitable for storing the result
-     * of such identity in a `DataSourceCache`.
+     * Fetches a value from the source of data by its given Identity.
+     *
+     * @param id for the fetched item Identity.
+     * @return IO<Option<Result>> since this operation represents an IO computation that returns an optional result. In
+     * case the result is not found, it'll return None.
      */
-    fun identity(i: I): DataSourceIdentity = name() toT i
+    fun fetch(id: Identity): IO<Option<Result>>
+
+    private fun fetchOneById(id: Identity): IO<Option<Tuple2<Identity, Result>>> =
+        fetch(id).map { Option.functor().tupleLeft(it, id).fix() }
 
     /**
-     * Fetch one identity, returning a None if it wasn't found.
+     * Fetch many identities, returning a mapping from identities to results. If an identity wasn't found, it won'
+     * t appear in the keys. It'll batch behind the scenes when needed.
+     *
+     * @param ids as a List of identities to fetch.
+     * @return IO<Map<Identity, Result>> representing an IO operation that will eventually return a map of relations
+     * from Id to Result for all the fetched items.
      */
-    fun fetchOne(id: I): Query<Option<A>>
-
-    /**
-     * Fetch many identities, returning a mapping from identities to results. If an
-     * identity wasn't found, it won't appear in the keys.
-     */
-    fun fetchMany(ids: NonEmptyList<I>): Query<Map<I, A>>
-
-    /**
-     * Use `fetchOne` for implementing of `fetchMany`. Use only when the data
-     * source doesn't support batching.
-     */
-    fun batchingNotSupported(ids: NonEmptyList<I>): Query<Map<I, A>> {
-        val fetchOneWithId: (I) -> Query<Option<Tuple2<I, A>>> = { id ->
-            fetchOne(id).map { Option.functor().tupleLeft(it, id).fix() }
+    fun batch(ids: List<Identity>): IO<Map<Identity, Result>> = when (ids.size) {
+        0 -> IO.just(mapOf())
+        1 -> IO.async { fetchOneById(ids[0]) }
+        2 -> IO.parallelMapN(CommonPool, fetchOneById(ids[0]), fetchOneById(ids[1])) { a, b -> a.toMap() + b.toMap() }
+        3 -> IO.parallelMapN(CommonPool, fetchOneById(ids[0]), fetchOneById(ids[1]), fetchOneById(ids[2])) { a, b, c ->
+            a.toMap() + b.toMap() + c.toMap()
         }
-
-        return ids.traverse(Query.applicative(), fetchOneWithId)
-            .fix()
-            .map {
-                it.map { it.orNull() }.all
-                    .filterNotNull()
-                    .map { Pair(it.a, it.b) }.toMap()
-            }
+        4 -> IO.parallelMapN(
+            CommonPool,
+            fetchOneById(ids[0]),
+            fetchOneById(ids[1]),
+            fetchOneById(ids[2]),
+            fetchOneById(ids[3])
+        ) { a, b, c, d ->
+            a.toMap() + b.toMap() + c.toMap() + d.toMap()
+        }
+        5 -> IO.parallelMapN(
+            CommonPool,
+            fetchOneById(ids[0]),
+            fetchOneById(ids[1]),
+            fetchOneById(ids[2]),
+            fetchOneById(ids[3]),
+            fetchOneById(ids[4])
+        ) { a, b, c, d, e ->
+            a.toMap() + b.toMap() + c.toMap() + d.toMap() + e.toMap()
+        }
+        6 -> IO.parallelMapN(
+            CommonPool,
+            fetchOneById(ids[0]),
+            fetchOneById(ids[1]),
+            fetchOneById(ids[2]),
+            fetchOneById(ids[3]),
+            fetchOneById(ids[4]),
+            fetchOneById(ids[5])
+        ) { a, b, c, d, e, f ->
+            a.toMap() + b.toMap() + c.toMap() + d.toMap() + e.toMap() + f.toMap()
+        }
+        7 -> IO.parallelMapN(
+            CommonPool,
+            fetchOneById(ids[0]),
+            fetchOneById(ids[1]),
+            fetchOneById(ids[2]),
+            fetchOneById(ids[3]),
+            fetchOneById(ids[4]),
+            fetchOneById(ids[5]),
+            fetchOneById(ids[6])
+        ) { a, b, c, d, e, f, g ->
+            a.toMap() + b.toMap() + c.toMap() + d.toMap() + e.toMap() + f.toMap() + g.toMap()
+        }
+        8 -> IO.parallelMapN(
+            CommonPool,
+            fetchOneById(ids[0]),
+            fetchOneById(ids[1]),
+            fetchOneById(ids[2]),
+            fetchOneById(ids[3]),
+            fetchOneById(ids[4]),
+            fetchOneById(ids[5]),
+            fetchOneById(ids[6]),
+            fetchOneById(ids[7])
+        ) { a, b, c, d, e, f, g, h ->
+            a.toMap() + b.toMap() + c.toMap() + d.toMap() + e.toMap() + f.toMap() + g.toMap() + h.toMap()
+        }
+        9 -> IO.parallelMapN(
+            CommonPool,
+            fetchOneById(ids[0]),
+            fetchOneById(ids[1]),
+            fetchOneById(ids[2]),
+            fetchOneById(ids[3]),
+            fetchOneById(ids[4]),
+            fetchOneById(ids[5]),
+            fetchOneById(ids[6]),
+            fetchOneById(ids[7]),
+            fetchOneById(ids[8])
+        ) { a, b, c, d, e, f, g, h, i ->
+            a.toMap() + b.toMap() + c.toMap() + d.toMap() + e.toMap() + f.toMap() + g.toMap() + h.toMap() + i.toMap()
+        }
+        else -> IO.raiseError(TooMuchConcurrencyException())
     }
 
-    fun batchingOnly(id: I): Query<Option<A>> =
-        fetchMany(id.nel()).map { Option.fromNullable(it[id]) }
+    fun <A, B> Option<Tuple2<A, B>>.toMap(): Map<A, B> {
+        val option = this
+        return when (option) {
+            is Some -> mapOf(option.get().a to option.get().b)
+            is None -> mapOf()
+        }
+    }
 
     fun maxBatchSize(): Option<Int> = None
 
-    fun batchExecution(): ExecutionType = Parallel
+    fun batchExecution(): BatchExecution = InParallel
 }
-
