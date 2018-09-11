@@ -42,8 +42,8 @@ interface DataSource<Identity : Any, Result> {
         fetch(id).map { Option.functor().tupleLeft(it, id).fix() }
 
     /**
-     * Fetch many identities, returning a mapping from identities to results. If an identity wasn't found, it won'
-     * t appear in the keys. It'll batch behind the scenes when needed.
+     * Fetch many identities paralelly, returning a mapping from identities to results. If an identity wasn't found,
+     * it won't appear in the keys.
      *
      * @param ids as a List of identities to fetch.
      * @return IO<Map<Identity, Result>> representing an IO operation that will eventually return a map of relations
