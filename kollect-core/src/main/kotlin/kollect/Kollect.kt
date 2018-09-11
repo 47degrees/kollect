@@ -52,11 +52,12 @@ private fun <I : Any, A> combineIdentities(x: KollectQuery<I, A>, y: KollectQuer
 
 /* Combines two requests to the same data source. */
 private fun <I : Any, A> combineRequests(x: BlockedRequest, y: BlockedRequest): BlockedRequest {
-    val requests = Pair(x.request, y.request)
-    return when (requests) {
-        is (KollectQuery.FetchOne<I, A>, KollectQuery.FetchOne<I, A>) -> {
-            val first = (requests.first as KollectQuery.FetchOne<I, A>)
-            val second = (requests.second as KollectQuery.FetchOne<I, A>)
+    val first = x.request
+    val second = y.request
+    return when {
+        first is KollectQuery.FetchOne<*, *> && second is KollectQuery.FetchOne<*, *> -> {
+            val first = (first as KollectQuery.FetchOne<I, A>)
+            val second = (second as KollectQuery.FetchOne<I, A>)
             val aId = first.id
             val ds = first.ds
             val anotherId = second.id
@@ -82,9 +83,9 @@ private fun <I : Any, A> combineRequests(x: BlockedRequest, y: BlockedRequest): 
                 BlockedRequest(newRequest, newResult)
             }
         }
-        is (KollectQuery.FetchOne<I, A>, KollectQuery.Batch<I, A>) -> {
-            val first = (requests.first as KollectQuery.FetchOne<I, A>)
-            val second = (requests.second as KollectQuery.Batch<I, A>)
+        first is KollectQuery.FetchOne<*, *> && second is KollectQuery.Batch<*, *> -> {
+            val first = (first as KollectQuery.FetchOne<I, A>)
+            val second = (second as KollectQuery.Batch<I, A>)
             val oneId = first.id
             val ds = first.ds
 
@@ -101,9 +102,9 @@ private fun <I : Any, A> combineRequests(x: BlockedRequest, y: BlockedRequest): 
             }
             BlockedRequest(newRequest, newResult)
         }
-        is (KollectQuery.Batch<I, A>, KollectQuery.FetchOne<I, A>) -> {
-            val first = (requests.first as KollectQuery.Batch<I, A>)
-            val second = (requests.second as KollectQuery.FetchOne<I, A>)
+        first is KollectQuery.Batch<*, *> && second is KollectQuery.FetchOne<*, *> -> {
+            val first = (first as KollectQuery.Batch<I, A>)
+            val second = (second as KollectQuery.FetchOne<I, A>)
             val oneId = second.id
             val ds = first.ds
 
@@ -120,10 +121,10 @@ private fun <I : Any, A> combineRequests(x: BlockedRequest, y: BlockedRequest): 
             }
             BlockedRequest(newRequest, newResult)
         }
-        // is (KollectQuery.Batch<I, A>, KollectQuery.Batch<I, A>)
+        // first is KollectQuery.Batch<*, *> && second is KollectQuery.Batch<*, *>
         else -> {
-            val first = (requests.first as KollectQuery.Batch<I, A>)
-            val second = (requests.second as KollectQuery.Batch<I, A>)
+            val first = (first as KollectQuery.Batch<I, A>)
+            val second = (second as KollectQuery.Batch<I, A>)
             val ds = first.ds
 
             val newRequest = KollectQuery.Batch(combineIdentities(first, second), ds)
