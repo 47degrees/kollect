@@ -8,10 +8,10 @@
 #lineWidth: 2
 #padding: 8
 #zoom: 1
-[<typeclasses>Applicative]<-[<instances>Applicative Instances|KollectApplicativeInstance|KollectOpApplicativeInstance|QueryApplicativeInstance]
+[<typeclasses>Applicative]<-[<typeclasses>Monad]
 [<typeclasses>Functor]<-[<typeclasses>Applicative]
 [<typeclasses>Monoid]<-[<instances>Monoid Instances|InMemoryCacheMonoidInstance]
 [<typeclasses>Semigroup]<-[<instances>Semigroup Instances|InMemoryCacheMonoidInstance]
 [<typeclasses>Semigroup]<-[<typeclasses>Monoid]
-[<typeclasses>Applicative]<-[<typeclasses>Monad]
+[<typeclasses>Applicative]<-[<instances>Applicative Instances|KollectApplicativeInstance|KollectOpApplicativeInstance|QueryApplicativeInstance|FiberApplicative]
 [<typeclasses>Monad]<-[<instances>Monad Instances|KollectMonad]

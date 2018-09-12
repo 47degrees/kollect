@@ -180,10 +180,10 @@ sealed class Kollect<A> : KollectOf<A> {
 
         fun <A> error(e: Throwable): Kollect<A> = exception { env -> KollectException.UnhandledException(e, env) }
 
-        fun <I : Any, A> apply(CS: ContextShift<ForIO>, id: I, ds: DataSource<I, A>): Kollect<A> =
+        /*fun <I : Any, A> apply(CS: ContextShift<ForIO>, id: I, ds: DataSource<I, A>): Kollect<A> =
             Unkollect(IO.monad().binding {
                 val deferred = DeferredK<ForIO, KollectStatus>()
-                /*request = FetchOne[I, A](id, ds)
+                *//*request = FetchOne[I, A](id, ds)
                 result = deferred.complete _
                     blocked = BlockedRequest(request, result)
                 anyDs = ds.asInstanceOf[DataSource[Any, Any]]
@@ -197,8 +197,8 @@ sealed class Kollect<A> : KollectOf<A> {
                         case FetchMissing() =>
                         IO.pure(Throw((env) => MissingIdentity[I, A](id, request, env)))
                     })
-                ))*/
-            })
+                ))*//*
+            })*/
     }
 }
 
