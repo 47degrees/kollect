@@ -14,12 +14,12 @@ import arrow.data.StateT
 import arrow.data.StateTPartialOf
 import arrow.data.WriterT
 import arrow.data.WriterTPartialOf
+import arrow.effects.typeclasses.MonadDefer
 import arrow.instance
 import arrow.typeclasses.Applicative
 import arrow.typeclasses.Functor
 import arrow.typeclasses.Monad
 import arrow.typeclasses.Monoid
-import kollect.arrow.effects.Timer
 import java.util.concurrent.TimeUnit
 
 /**
@@ -124,12 +124,12 @@ interface Clock<F> {
         /**
          * Provides Clock instance for any `F` that has `Sync` defined
          */
-        fun <F> create(SF: Sync<F>): Clock<F> = object : Clock<F> {
+        fun <F> create(SF: MonadDefer<F>): Clock<F> = object : Clock<F> {
             override fun realTime(unit: TimeUnit): Kind<F, Long> =
-                SF.delay(unit.convert(System.currentTimeMillis(), TimeUnit.MILLISECONDS))
+                SF { unit.convert(System.currentTimeMillis(), TimeUnit.MILLISECONDS) }
 
             override fun monotonic(unit: TimeUnit): Kind<F, Long> =
-                SF.delay(unit.convert(System.nanoTime(), TimeUnit.NANOSECONDS))
+                SF { unit.convert(System.nanoTime(), TimeUnit.NANOSECONDS) }
         }
 
         /**
