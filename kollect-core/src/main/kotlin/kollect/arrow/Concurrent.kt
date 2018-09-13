@@ -5,6 +5,7 @@ import arrow.core.Tuple2
 import arrow.effects.IO
 import arrow.effects.typeclasses.Async
 import kollect.arrow.concurrent.FiniteDuration
+import kollect.arrow.concurrent.Ref
 import kollect.arrow.effects.Timer
 
 /**
