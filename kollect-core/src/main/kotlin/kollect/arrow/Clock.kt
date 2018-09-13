@@ -22,7 +22,6 @@ import arrow.typeclasses.Monoid
 import kollect.arrow.effects.Timer
 import java.util.concurrent.TimeUnit
 
-
 /**
  * Clock provides the current time, as a pure alternative to:
  *

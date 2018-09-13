@@ -18,12 +18,6 @@ import arrow.typeclasses.Applicative
 import arrow.typeclasses.Functor
 import arrow.typeclasses.Monad
 import arrow.typeclasses.Monoid
-import kollect.arrow.Clock
-import kollect.arrow.EitherTClock
-import kollect.arrow.KleisliClock
-import kollect.arrow.OptionTClock
-import kollect.arrow.StateTClock
-import kollect.arrow.WriterTClock
 import kollect.arrow.concurrent.FiniteDuration
 
 /**
