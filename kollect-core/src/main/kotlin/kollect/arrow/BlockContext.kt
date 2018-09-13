@@ -1,4 +1,4 @@
-package kollect.arrow
+package kollect.arrow.concurrent
 
 /**
  * A context to be notified by `scala.concurrent.blocking` when

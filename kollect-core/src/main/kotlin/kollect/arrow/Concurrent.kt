@@ -5,6 +5,7 @@ import arrow.core.Tuple2
 import arrow.effects.IO
 import arrow.effects.typeclasses.Async
 import kollect.arrow.concurrent.FiniteDuration
+import kollect.arrow.effects.Timer
 
 /**
  * Type class for [[Async]] data types that are cancelable and can be started concurrently.
@@ -106,6 +107,8 @@ interface Concurrent<F> : Async<F> {
     fun <A> cancelable(k: ((Either<Throwable, A>) -> Unit) -> CancelToken<F>): arrow.Kind<F, A> =
         Concurrent.defaultCancelable(k)(this)
 
+    // TODO uncomment when we can add this data type to Arrow. IO.Pure, IO.RaiseError and the rest of the
+    // TODO implementations of the sealed class IO are internal in Arrow.
     /**
      * Inherited from [[LiftIO]], defines a conversion from [[IO]]
      * in terms of the `Concurrent` type class.
@@ -165,11 +168,19 @@ interface Concurrent<F> : Async<F> {
          * @param fallback is the task evaluated after the duration has passed and
          *        the source canceled
          */
-        fun <F, A> timeoutTo(CF: Concurrent<F>, timer: Timer<F>, fa: arrow.Kind<F, A>, duration: FiniteDuration, fallback: arrow.Kind<F, A>): arrow.Kind<F, A> =
-        F.race(fa, timer.sleep(duration)) flatMap
-        {
-            case Left (a) => F.pure(a)
-            case Right (_) => fallback
+        fun <F, A> timeoutTo(
+            CF: Concurrent<F>,
+            timer: Timer<F>,
+            fa: arrow.Kind<F, A>,
+            duration: FiniteDuration,
+            fallback: arrow.Kind<F, A>
+        ): arrow.Kind<F, A> = CF.run {
+            CF.race(fa, timer.sleep(duration)).flatMap {
+                when (it) {
+                    is Either.Left -> CF.just(it.a)
+                    is Either.Right ->fallback
+                }
+            }
         }
 
         /**
@@ -179,7 +190,7 @@ interface Concurrent<F> : Async<F> {
          *
          * Note: `start` can be used for eager memoization.
          */
-        def memoize[F[_], A](f: F[A])(implicit F: Concurrent[F]): F[F[A]] =
+        fun <F, A> memoize(CF: Concurrent<F>, f: arrow.Kind<F, A>): arrow.Kind<F, arrow.Kind<F, A>> =
         Ref.of[F, Option[Deferred[F, Either[Throwable, A]]]](None).map
         {
             ref =>
