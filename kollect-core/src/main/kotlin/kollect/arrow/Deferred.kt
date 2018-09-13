@@ -1,8 +1,9 @@
 /*
 package arrow.effects
 
-import arrow.data.StateT
-import arrow.typeclasses.Monad
+import arrow.effects.typeclasses.Async
+import java.util.concurrent.atomic.AtomicReference
+
 
 */
 /**
@@ -27,12 +28,15 @@ import arrow.typeclasses.Monad
  * blocked by the implementation.
  *//*
 
+
 abstract class Deferred<F, A> {
+
     */
 /**
      * Obtains the value of the `Deferred`, or waits until it has been completed.
      * The returned value may be canceled.
      *//*
+
 
     abstract fun get(): arrow.Kind<F, A>
 
@@ -63,7 +67,8 @@ abstract class Deferred<F, A> {
         */
 /** Creates an unset promise. **//*
 
-        inline operator fun <F, A> invoke(CF: Concurrent<F>): arrow.Kind<F, Deferred<F, A>> = F.delay(unsafe[F, A])
+
+        inline operator fun <F, A> invoke(CF: Concurrent<F>): arrow.Kind<F, Deferred<F, A>> = CF { unsafe<F, A> }
 
         */
 /**
@@ -73,8 +78,8 @@ abstract class Deferred<F, A> {
          * allocates mutable state.
          *//*
 
-        def unsafe[F[_]: Concurrent, A]: Deferred[F, A] =
-        new ConcurrentDeferred[F, A](new AtomicReference(Deferred.State.Unset(LinkedMap.empty)))
+        fun <CF : Concurrent<F>, F, A> unsafe(): Deferred<F, A> =
+            ConcurrentDeferred<F, A>(AtomicReference(Deferred.State.Unset(LinkedMap.empty)))
 
         */
 /**
@@ -88,8 +93,8 @@ abstract class Deferred<F, A> {
          * that does not support cancellation is used.
          *//*
 
-        def uncancelable[F[_], A](implicit F: Async[F]): F[Deferred[F, A]] =
-        F.delay(unsafeUncancelable[F, A])
+        fun <F, A> uncancelable(MD: Async<F>): arrow.Kind<F, Deferred<F, A>> =
+            MD { unsafeUncancelable<Async<F>, F, A>() }
 
         */
 /**
@@ -101,90 +106,100 @@ abstract class Deferred<F, A> {
          * WARN: read the caveats of [[uncancelable]].
          *//*
 
-        def unsafeUncancelable[F[_]: Async, A]: Deferred[F, A] =
-        new UncancelabbleDeferred[F, A](Promise[A]())
+        fun <AF : Async<F>, F, A> unsafeUncancelable(): Deferred<F, A> =
+            UncancelabbleDeferred<F, A>(Promise<A>())
 
-        private final class Id
+*/
+/*
+private final class Id
 
-        private sealed abstract class State[A]
-        private object State {
-            final case class Set[A](a: A) extends State[A]
-            final case class Unset[A](waiting: LinkedMap[Id, A => Unit]) extends State[A]
-        }
+private sealed abstract class State[A]
+private object State {
+    final case
+    class Set[A](a: A) extends State[A]
+    final case
+    class Unset[A](waiting: LinkedMap[Id, A => Unit]) extends State[A]
+}
 
-        private final class ConcurrentDeferred[F[_], A](ref: AtomicReference[State[A]])(implicit F: Concurrent[F])
-        extends Deferred[F, A] {
+private final class ConcurrentDeferred[F[_], A](ref: AtomicReference[State[A]])(implicit F: Concurrent[F])
+extends Deferred[F, A]
+{
 
-            def get: F[A] =
-                F.suspend {
-                    ref.get match {
-                        case State.Set(a) => F.pure(a)
-                        case State.Unset(_) =>
-                        F.cancelable { cb =>
-                            val id = unsafeRegister(cb)
-                            @tailrec
-                            def unregister(): Unit =
-                            ref.get match {
-                                case State.Set(_) => ()
-                                case s @ State.Unset(waiting) =>
-                                val updated = State.Unset(waiting - id)
-                                if (ref.compareAndSet(s, updated)) ()
-                                else unregister()
-                            }
-                            F.delay(unregister())
-                        }
-                    }
-                }
-
-            private[this] def unsafeRegister(cb: Either[Throwable, A] => Unit): Id = {
-                val id = new Id
-
+    def get : F [A] =
+        F.suspend {
+            ref.get match {
+                case State . Set (a) => F.pure(a)
+                case State . Unset (_) =>
+                F.cancelable {
+                    cb =>
+                    val id = unsafeRegister(cb)
                     @tailrec
-                    def register(): Option[A] =
-                ref.get match {
-                    case State.Set(a) => Some(a)
-                    case s @ State.Unset(waiting) =>
-                    val updated = State.Unset(waiting.updated(id, (a: A) => cb(Right(a))))
-                    if (ref.compareAndSet(s, updated)) None
-                    else register()
-                }
-
-                register().foreach(a => cb(Right(a)))
-                id
-            }
-
-            def complete(a: A): F[Unit] = {
-                def notifyReaders(r: State.Unset[A]): Unit =
-                r.waiting.values.foreach { cb =>
-                    cb(a)
-                }
-
-                @tailrec
-                def loop(): Unit =
-                ref.get match {
-                    case State.Set(_) => throw new IllegalStateException("Attempting to complete a Deferred that has already been completed")
-                    case s @ State.Unset(_) =>
-                    if (ref.compareAndSet(s, State.Set(a))) notifyReaders(s)
-                    else loop()
-                }
-
-                F.delay(loop())
-            }
-        }
-
-        private final class UncancelabbleDeferred[F[_], A](p: Promise[A])(implicit F: Async[F]) extends Deferred[F, A] {
-            def get: F[A] =
-                F.async { cb =>
-                    implicit val ec: ExecutionContext = TrampolineEC.immediate
-                    p.future.onComplete {
-                        case Success(a) => cb(Right(a))
-                        case Failure(t) => cb(Left(t))
+                    def unregister (): Unit =
+                    ref.get match {
+                        case State . Set (_) => ()
+                        case s @ State.Unset(waiting) =>
+                        val updated = State.Unset(waiting - id)
+                        if (ref.compareAndSet(s, updated)) ()
+                        else unregister()
                     }
+                    F.delay(unregister())
                 }
-
-            def complete(a: A): F[Unit] =
-            F.delay(p.success(a))
+            }
         }
+
+    private[this] def unsafeRegister(cb: Either[ Throwable, A] => Unit): Id = {
+    val id = new Id
+
+        @tailrec
+        def register (): Option[A] =
+    ref.get match {
+        case State . Set (a) => Some(a)
+        case s @ State.Unset(waiting) =>
+        val updated = State.Unset(waiting.updated(id, (a: A) => cb (Right(a))))
+        if (ref.compareAndSet(s, updated)) None
+        else register()
     }
+
+    register().foreach(a => cb (Right(a)))
+    id
+}
+
+    def complete (a: A): F[Unit] = {
+    def notifyReaders (r: State.Unset[A]): Unit =
+    r.waiting.values.foreach {
+        cb =>
+        cb(a)
+    }
+
+    @tailrec
+    def loop (): Unit =
+    ref.get match {
+        case State . Set (_) => throw new IllegalStateException("Attempting to complete a Deferred that has already been completed")
+        case s @ State.Unset(_) =>
+        if (ref.compareAndSet(s, State.Set(a))) notifyReaders(s)
+        else loop()
+    }
+
+    F.delay(loop())
+}
+}
+
+private final class UncancelabbleDeferred[F[_], A](p: Promise[A])(implicit F: Async[F]) extends Deferred[F, A]
+{
+    def get : F [A] =
+        F.async {
+            cb =>
+            implicit
+            val ec: ExecutionContext = TrampolineEC.immediate
+            p.future.onComplete {
+                case Success (a) => cb(Right(a))
+                case Failure (t) => cb(Left(t))
+            }
+        }
+
+    def complete (a: A): F[Unit] =
+    F.delay(p.success(a))
+}
+}
 }
 */

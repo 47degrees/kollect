@@ -8,17 +8,12 @@ import arrow.core.toOption
 import arrow.data.NonEmptyList
 import arrow.data.foldLeft
 import arrow.effects.DeferredK
-import arrow.effects.ForIO
-import arrow.effects.IO
-import arrow.effects.applicative
-import arrow.effects.fix
-import arrow.effects.monad
+import arrow.effects.typeclasses.Async
 import arrow.higherkind
 import arrow.instance
+import arrow.typeclasses.Applicative
 import arrow.typeclasses.Monad
 import arrow.typeclasses.binding
-import kollect.arrow.ContextShift
-import kotlinx.coroutines.experimental.Deferred
 
 // Kollect queries
 interface KollectRequest
@@ -54,7 +49,7 @@ sealed class KollectException : NoStackTrace() {
 }
 
 // In-progress request
-data class BlockedRequest(val request: KollectRequest, val result: (KollectStatus) -> IO<Unit>)
+data class BlockedRequest<F>(val request: KollectRequest, val result: (KollectStatus) -> arrow.Kind<F, Unit>)
 
 /* Combines the identities of two `KollectQuery` to the same data source. */
 private fun <I : Any, A> combineIdentities(x: KollectQuery<I, A>, y: KollectQuery<I, A>): NonEmptyList<I> =
@@ -62,8 +57,11 @@ private fun <I : Any, A> combineIdentities(x: KollectQuery<I, A>, y: KollectQuer
         if (acc.contains(i)) acc else NonEmptyList(acc.head, acc.tail + i)
     }
 
-/* Combines two requests to the same data source. */
-private fun <I : Any, A> combineRequests(x: BlockedRequest, y: BlockedRequest): BlockedRequest {
+/**
+ * Combines two requests to the same data source.
+ */
+@Suppress("UNCHECKED_CAST")
+private fun <I : Any, A, F> combineRequests(MF: Monad<F>, x: BlockedRequest<F>, y: BlockedRequest<F>): BlockedRequest<F> {
     val first = x.request
     val second = y.request
     return when {
@@ -75,7 +73,7 @@ private fun <I : Any, A> combineRequests(x: BlockedRequest, y: BlockedRequest): 
             val anotherId = second.id
             if (aId == anotherId) {
                 val newRequest = KollectQuery.KollectOne(aId, ds)
-                val newResult = { r: KollectStatus -> IO.applicative().tupled(x.result(r), y.result(r)).fix().flatMap { IO.unit } }
+                val newResult = { r: KollectStatus -> MF.run { tupled(x.result(r), y.result(r)).flatMap { MF.just(Unit) } } }
                 BlockedRequest(newRequest, newResult)
             } else {
                 val newRequest = KollectQuery.Batch(combineIdentities(first, second), ds)
@@ -85,11 +83,11 @@ private fun <I : Any, A> combineRequests(x: BlockedRequest, y: BlockedRequest): 
                             r.result as Map<*, *>
                             val xResult = r.result[aId].toOption().map { KollectStatus.KollectDone(it) }.getOrElse { KollectStatus.KollectMissing }
                             val yResult = r.result[anotherId].toOption().map { KollectStatus.KollectDone(it) }.getOrElse { KollectStatus.KollectMissing }
-                            IO.applicative().tupled(x.result(xResult), y.result(yResult)).fix().flatMap { IO.unit }
+                            MF.run { tupled(x.result(xResult), y.result(yResult)).flatMap { MF.just(Unit) } }
                         }
 
                         is KollectStatus.KollectMissing ->
-                            IO.applicative().tupled(x.result(r), y.result(r)).fix().flatMap { IO.unit }
+                            MF.run { tupled(x.result(r), y.result(r)).flatMap { MF.just(Unit) } }
                     }
                 }
                 BlockedRequest(newRequest, newResult)
@@ -107,9 +105,9 @@ private fun <I : Any, A> combineRequests(x: BlockedRequest, y: BlockedRequest): 
                     is KollectStatus.KollectDone<*> -> {
                         r.result as Map<*, *>
                         val oneResult = r.result[oneId].toOption().map { KollectStatus.KollectDone(it) }.getOrElse { KollectStatus.KollectMissing }
-                        IO.applicative().tupled(x.result(oneResult), y.result(r)).fix().flatMap { IO.unit }
+                        MF.run { tupled(x.result(oneResult), y.result(r)).flatMap { MF.just(Unit) } }
                     }
-                    is KollectStatus.KollectMissing -> IO.applicative().tupled(x.result(r), y.result(r)).fix().flatMap { IO.unit }
+                    is KollectStatus.KollectMissing -> MF.run { tupled(x.result(r), y.result(r)).flatMap { MF.just(Unit) } }
                 }
             }
             BlockedRequest(newRequest, newResult)
@@ -126,9 +124,9 @@ private fun <I : Any, A> combineRequests(x: BlockedRequest, y: BlockedRequest): 
                     is KollectStatus.KollectDone<*> -> {
                         r.result as Map<*, *>
                         val oneResult = r.result[oneId].toOption().map { KollectStatus.KollectDone(it) }.getOrElse { KollectStatus.KollectMissing }
-                        IO.applicative().tupled(x.result(r), y.result(oneResult)).fix().flatMap { IO.unit }
+                        MF.run { tupled(x.result(r), y.result(oneResult)).flatMap { MF.just(Unit) } }
                     }
-                    is KollectStatus.KollectMissing -> IO.applicative().tupled(x.result(r), y.result(r)).fix().flatMap { IO.unit }
+                    is KollectStatus.KollectMissing -> MF.run { tupled(x.result(r), y.result(r)).flatMap { MF.just(Unit) } }
                 }
             }
             BlockedRequest(newRequest, newResult)
@@ -140,115 +138,123 @@ private fun <I : Any, A> combineRequests(x: BlockedRequest, y: BlockedRequest): 
             val ds = first.ds
 
             val newRequest = KollectQuery.Batch(combineIdentities(first, second), ds)
-            val newResult = { r: KollectStatus -> IO.applicative().tupled(x.result(r), y.result(r)).fix().flatMap { IO.unit } }
+            val newResult = { r: KollectStatus -> MF.run { tupled(x.result(r), y.result(r)).flatMap { MF.just(Unit) } } }
             BlockedRequest(newRequest, newResult)
         }
     }
 }
 
 /* A map from data sources to blocked requests used to group requests to the same data source. */
-data class RequestMap(val m: Map<DataSource<Any, Any>, BlockedRequest>)
+data class RequestMap<F>(val m: Map<DataSource<Any, Any>, BlockedRequest<F>>)
 
 /* Combine two `RequestMap` instances to batch requests to the same data source. */
-private fun <I : Any, A> combineRequestMaps(x: RequestMap, y: RequestMap): RequestMap =
+private fun <I : Any, A, F> combineRequestMaps(MF: Monad<F>, x: RequestMap<F>, y: RequestMap<F>): RequestMap<F> =
     RequestMap(x.m.foldLeft(y.m) { acc, tuple ->
-        val combinedReq: BlockedRequest = acc.get(tuple.key).toOption().fold({ tuple.value }, { combineRequests<I, A>(tuple.value, it) })
+        val combinedReq: BlockedRequest<F> = acc[tuple.key].toOption().fold({ tuple.value }, { combineRequests<I, A, F>(MF, tuple.value, it) })
         acc.filterNot { it.key == tuple.key } + mapOf(tuple.key to combinedReq)
     })
 
 // `Kollect` result data type
-sealed class KollectResult<A> {
-    data class Done<A>(val x: A) : KollectResult<A>()
-    data class Blocked<A>(val rs: RequestMap, val cont: Kollect<A>) : KollectResult<A>()
-    data class Throw<A>(val e: (Env) -> KollectException) : KollectResult<A>()
+sealed class KollectResult<F, A> {
+    data class Done<F, A>(val x: A) : KollectResult<F, A>()
+    data class Blocked<F, A>(val rs: RequestMap<F>, val cont: Kollect<F, A>) : KollectResult<F, A>()
+    data class Throw<F, A>(val e: (Env) -> KollectException) : KollectResult<F, A>()
 }
 
 // Kollect data type
 @higherkind
-sealed class Kollect<A> : KollectOf<A> {
-    abstract val run: IO<KollectResult<A>>
+sealed class Kollect<F, A> : KollectOf<F, A> {
 
-    data class Unkollect<A>(override val run: IO<KollectResult<A>>) : Kollect<A>()
+    abstract val run: arrow.Kind<F, KollectResult<F, A>>
+
+    data class Unkollect<F, A>(override val run: arrow.Kind<F, KollectResult<F, A>>) : Kollect<F, A>()
 
     companion object {
         /**
          * Lift a plain value to the Kollect monad.
          */
-        fun <A> pure(a: A): Kollect<A> = Unkollect(IO.just(KollectResult.Done(a)))
+        fun <F, A> pure(AF: Applicative<F>, a: A): Kollect<F, A> = Unkollect(AF.just(KollectResult.Done(a)))
 
-        fun <A> exception(e: (Env) -> KollectException): Kollect<A> = Unkollect(IO.just(KollectResult.Throw(e)))
+        fun <F, A> exception(AF: Applicative<F>, e: (Env) -> KollectException): Kollect<F, A> = Unkollect(AF.just(KollectResult.Throw(e)))
 
-        fun <A> error(e: Throwable): Kollect<A> = exception { env -> KollectException.UnhandledException(e, env) }
+        fun <F, A> error(AF: Applicative<F>, e: Throwable): Kollect<F, A> = exception(AF) { env -> KollectException.UnhandledException(e, env) }
 
-        /*fun <I : Any, A> apply(CS: ContextShift<ForIO>, id: I, ds: DataSource<I, A>): Kollect<A> =
-            Unkollect(IO.monad().binding {
-                val deferred = DeferredK<ForIO, KollectStatus>()
-                *//*request = FetchOne[I, A](id, ds)
-                result = deferred.complete _
-                    blocked = BlockedRequest(request, result)
-                anyDs = ds.asInstanceOf[DataSource[Any, Any]]
-                blockedRequest = RequestMap(Map(anyDs -> blocked))
-                for {
+        @Suppress("UNCHECKED_CAST")
+        inline operator fun <F, I : Any, A> invoke(AF: Async<F>, id: I, ds: DataSource<I, A>): Kollect<F, A> =
+            Unkollect<F, A>(AF.binding {
+                val deferred = DeferredK.just(KollectStatus.KollectDone(Unit))
+                val request = KollectQuery.KollectOne(id, ds)
+                val result = deferred
 
-                } yield Blocked(blockedRequest, Unfetch(
-                    deferred.get.flatMap(_ match {
-                        case FetchDone(a: A) =>
-                        IO.pure(Done(a))
-                        case FetchMissing() =>
-                        IO.pure(Throw((env) => MissingIdentity[I, A](id, request, env)))
-                    })
-                ))*//*
-            })*/
+                val blocked = BlockedRequest<F>(request, result)
+                val anyDs = ds as DataSource<Any, Any>
+                val blockedRequest = RequestMap<F>(mapOf(anyDs to blocked))
+
+                KollectResult.Blocked(blockedRequest, Unkollect<F, A>(
+                    deferred.get().flatMap {
+                        case FetchDone (a: A) =>
+                        Applicative[F].pure(KollectResult.Done(a))
+                        case FetchMissing () =>
+                        Applicative[F].pure(KollectResult.Throw((env) => MissingIdentity (id, request, env)))
+                    }
+                ))
+            })
     }
 }
 
 // Kollect ops
 @instance(Kollect::class)
-interface KollectMonad<Identity : Any, Result> : Monad<ForKollect> {
-    override fun <A> just(a: A): Kollect<A> = Kollect.Unkollect(IO.just(KollectResult.Done(a)))
+interface KollectMonad<F, Identity : Any, Result> : Monad<KollectPartialOf<F>> {
 
-    override fun <A, B> Kind<ForKollect, A>.map(f: (A) -> B): Kollect<B> = Kollect.Unkollect(IO.monad().binding {
-        val kollect = this@map.fix().run.bind()
-        val result = when (kollect) {
-            is KollectResult.Done -> KollectResult.Done(f(kollect.x))
-            is KollectResult.Blocked -> KollectResult.Blocked(kollect.rs, kollect.cont.map(f))
-            is KollectResult.Throw -> KollectResult.Throw(kollect.e)
-        }
-        result
-    }.fix())
+    fun MF(): Monad<F>
 
-    override fun <A, B> Kind<ForKollect, A>.product(fb: Kind<ForKollect, B>): Kollect<Tuple2<A, B>> = Kollect.Unkollect(IO.monad().binding {
-        val fab = IO.applicative().tupled(this@product.fix().run, fb.fix().run).bind()
-        val first = fab.a
-        val second = fab.b
-        val result = when {
-            first is KollectResult.Throw -> KollectResult.Throw(first.e)
-            first is KollectResult.Done && second is KollectResult.Done -> KollectResult.Done(Tuple2(first.x, second.x))
-            first is KollectResult.Done && second is KollectResult.Blocked -> KollectResult.Blocked(second.rs, this@product.product(second.cont))
-            first is KollectResult.Blocked && second is KollectResult.Done -> KollectResult.Blocked(first.rs, first.cont.product(fb))
-            first is KollectResult.Blocked && second is KollectResult.Blocked -> KollectResult.Blocked(combineRequestMaps<Identity, Result>(first.rs, second.rs), first.cont.product(second.cont))
-            // second is KollectResult.Throw
-            else -> KollectResult.Throw((second as KollectResult.Throw).e)
-        }
-        result
-    }.fix())
+    override fun <A> just(a: A): Kollect<F, A> = Kollect.Unkollect(MF().just(KollectResult.Done(a)))
 
-    override fun <A, B> tailRecM(a: A, f: (A) -> Kind<ForKollect, Either<A, B>>): Kollect<B> = f(a).flatMap {
-        when (it) {
-            is Either.Left -> tailRecM(a, f)
-            is Either.Right -> just(it.b)
-        }
-    }
+    override fun <A, B> Kind<KollectPartialOf<F>, A>.map(f: (A) -> B): Kollect<F, B> =
+        Kollect.Unkollect(MF().binding {
+            val kollect = this@map.fix().run.bind()
+            val result = when (kollect) {
+                is KollectResult.Done -> KollectResult.Done<F, B>(f(kollect.x))
+                is KollectResult.Blocked -> KollectResult.Blocked(kollect.rs, kollect.cont.map(f))
+                is KollectResult.Throw -> KollectResult.Throw<F, B>(kollect.e)
+            }
+            result
+        })
 
-    override fun <A, B> Kind<ForKollect, A>.flatMap(f: (A) -> Kind<ForKollect, B>): Kollect<B> =
-        Kollect.Unkollect(IO.monad().binding {
+    override fun <A, B> Kind<KollectPartialOf<F>, A>.product(fb: Kind<KollectPartialOf<F>, B>): Kollect<F, Tuple2<A, B>> =
+        Kollect.Unkollect(MF().binding {
+            val fab = MF().run { tupled(this@product.fix().run, fb.fix().run).bind() }
+            val first = fab.a
+            val second = fab.b
+            val result = when {
+                first is KollectResult.Throw -> KollectResult.Throw<F, Tuple2<A, B>>(first.e)
+                first is KollectResult.Done && second is KollectResult.Done -> KollectResult.Done(Tuple2(first.x, second.x))
+                first is KollectResult.Done && second is KollectResult.Blocked -> KollectResult.Blocked(second.rs, this@product.product(second.cont))
+                first is KollectResult.Blocked && second is KollectResult.Done -> KollectResult.Blocked(first.rs, first.cont.product(fb))
+                first is KollectResult.Blocked && second is KollectResult.Blocked -> KollectResult.Blocked(combineRequestMaps<Identity, Result, F>(MF(), first.rs, second.rs), first.cont.product(second.cont))
+                // second is KollectResult.Throw
+                else -> KollectResult.Throw((second as KollectResult.Throw).e)
+            }
+            result
+        })
+
+    override fun <A, B> tailRecM(a: A, f: (A) -> Kind<KollectPartialOf<F>, Either<A, B>>): Kollect<F, B> =
+        f(a).flatMap {
+            when (it) {
+                is Either.Left -> tailRecM(a, f)
+                is Either.Right -> just(it.b)
+            }
+        }.fix()
+
+    override fun <A, B> Kind<KollectPartialOf<F>, A>.flatMap(f: (A) -> Kind<KollectPartialOf<F>, B>): Kollect<F, B> =
+        Kollect.Unkollect(MF().binding {
             val kollect = this@flatMap.fix().run.bind()
-            val result: Kollect<B> = when {
-                kollect is KollectResult.Done -> f(kollect.x).fix()
-                kollect is KollectResult.Throw -> Kollect.Unkollect(IO.just(KollectResult.Throw(kollect.e)))
+            val result: Kollect<F, B> = when (kollect) {
+                is KollectResult.Done -> f(kollect.x).fix()
+                is KollectResult.Throw -> Kollect.Unkollect(MF().just(KollectResult.Throw(kollect.e)))
                 // kollect is KollectResult.Blocked
-                else -> Kollect.Unkollect(IO.just(KollectResult.Blocked((kollect as KollectResult.Blocked).rs, kollect.cont.flatMap(f))))
+                else -> Kollect.Unkollect(MF().just(KollectResult.Blocked((kollect as KollectResult.Blocked).rs, kollect.cont.flatMap(f))))
             }
             result.run.bind()
-        }.fix())
+        })
 }
