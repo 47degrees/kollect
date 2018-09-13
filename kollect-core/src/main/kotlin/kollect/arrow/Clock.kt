@@ -1,4 +1,4 @@
-package kollect.arrow
+package kollect.arrow.effects
 
 import arrow.Kind
 import arrow.core.Tuple2
@@ -10,12 +10,16 @@ import arrow.data.Kleisli
 import arrow.data.KleisliPartialOf
 import arrow.data.OptionT
 import arrow.data.OptionTPartialOf
+import arrow.data.StateT
+import arrow.data.StateTPartialOf
 import arrow.data.WriterT
 import arrow.data.WriterTPartialOf
 import arrow.instance
 import arrow.typeclasses.Applicative
 import arrow.typeclasses.Functor
+import arrow.typeclasses.Monad
 import arrow.typeclasses.Monoid
+import kollect.arrow.effects.Timer
 import java.util.concurrent.TimeUnit
 
 
@@ -165,6 +169,18 @@ interface OptionTClock<F> : Clock<OptionTPartialOf<F>> {
     override fun monotonic(unit: TimeUnit): OptionT<F, Long> = FF().run {
         OptionT(clock().monotonic(unit).map { it.some() })
     }
+}
+
+@instance(Clock::class)
+interface StateTClock<F, S> : Clock<StateTPartialOf<F, S>> {
+
+    fun MF(): Monad<F>
+
+    fun clock(): Clock<F>
+
+    override fun realTime(unit: TimeUnit): StateT<F, S, Long> = StateT.lift(MF(), clock().realTime(unit))
+
+    override fun monotonic(unit: TimeUnit): StateT<F, S, Long> = StateT.lift(MF(), clock().monotonic(unit))
 }
 
 @instance(Clock::class)

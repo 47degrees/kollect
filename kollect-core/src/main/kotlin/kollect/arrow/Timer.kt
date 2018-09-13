@@ -1,5 +1,30 @@
-package kollect.arrow
+package kollect.arrow.effects
 
+import arrow.core.Tuple2
+import arrow.core.right
+import arrow.core.some
+import arrow.data.EitherT
+import arrow.data.EitherTPartialOf
+import arrow.data.Kleisli
+import arrow.data.KleisliPartialOf
+import arrow.data.OptionT
+import arrow.data.OptionTPartialOf
+import arrow.data.StateT
+import arrow.data.StateTPartialOf
+import arrow.data.WriterT
+import arrow.data.WriterTPartialOf
+import arrow.instance
+import arrow.typeclasses.Applicative
+import arrow.typeclasses.Functor
+import arrow.typeclasses.Monad
+import arrow.typeclasses.Monoid
+import kollect.arrow.Clock
+import kollect.arrow.EitherTClock
+import kollect.arrow.KleisliClock
+import kollect.arrow.OptionTClock
+import kollect.arrow.StateTClock
+import kollect.arrow.WriterTClock
+import kollect.arrow.concurrent.FiniteDuration
 
 /**
  * Timer is a scheduler of tasks.
@@ -22,7 +47,7 @@ package kollect.arrow
  * This is NOT a type class, as it does not have the coherence
  * requirement.
  */
-interface Timer<F>  {
+interface Timer<F> {
     /**
      * Returns a [[Clock]] instance associated with this timer
      * that can provide the current time and do time measurements.
@@ -49,67 +74,100 @@ interface Timer<F>  {
      * boundary, even if the provided `timespan` is less or
      * equal to zero.
      */
-    def sleep(duration: FiniteDuration): F[Unit]
+    fun sleep(duration: FiniteDuration): arrow.Kind<F, Unit>
 }
 
-object Timer {
-    /**
-     * Derives a [[Timer]] instance for `cats.data.EitherT`,
-     * given we have one for `F[_]`.
-     */
-    implicit def deriveEitherT[F[_], L](implicit F: Functor[F], timer: Timer[F]): Timer[EitherT[F, L, ?]] =
-    new Timer[EitherT[F, L, ?]] {
-        val clock: Clock[EitherT[F, L, ?]] = Clock.deriveEitherT
+@instance(Timer::class)
+interface EitherTTimer<F, L> : Timer<EitherTPartialOf<F, L>> {
+    fun FF(): Functor<F>
 
-        def sleep(duration: FiniteDuration): EitherT[F, L, Unit] =
-        EitherT.liftF(timer.sleep(duration))
+    fun TF(): Timer<F>
+
+    fun CF(): Clock<F>
+
+    override fun clock(): Clock<EitherTPartialOf<F, L>> = object : EitherTClock<F, L> {
+        override fun clock(): Clock<F> = CF()
+
+        override fun FF(): Functor<F> = FF()
     }
 
-    /**
-     * Derives a [[Timer]] instance for `cats.data.OptionT`,
-     * given we have one for `F[_]`.
-     */
-    implicit def deriveOptionT[F[_]](implicit F: Functor[F], timer: Timer[F]): Timer[OptionT[F, ?]] =
-    new Timer[OptionT[F, ?]] {
-        val clock: Clock[OptionT[F, ?]] = Clock.deriveOptionT
+    override fun sleep(duration: FiniteDuration): EitherT<F, L, Unit> = FF().run {
+        EitherT(TF().sleep(duration).map { it.right() })
+    }
+}
 
-        def sleep(duration: FiniteDuration): OptionT[F, Unit] =
-        OptionT.liftF(timer.sleep(duration))
+@instance(Timer::class)
+interface OptionTTimer<F> : Timer<OptionTPartialOf<F>> {
+    fun FF(): Functor<F>
+
+    fun TF(): Timer<F>
+
+    fun CF(): Clock<F>
+
+    override fun clock(): Clock<OptionTPartialOf<F>> = object : OptionTClock<F> {
+        override fun FF(): Functor<F> = FF()
+
+        override fun clock(): Clock<F> = CF()
     }
 
-    /**
-     * Derives a [[Timer]] instance for `cats.data.WriterT`,
-     * given we have one for `F[_]`.
-     */
-    implicit def deriveWriterT[F[_], L](implicit F: Applicative[F], L: Monoid[L], timer: Timer[F]): Timer[WriterT[F, L, ?]] =
-    new Timer[WriterT[F, L, ?]] {
-        val clock: Clock[WriterT[F, L, ?]] = Clock.deriveWriterT
+    override fun sleep(duration: FiniteDuration): OptionT<F, Unit> = FF().run {
+        OptionT(TF().sleep(duration).map { it.some() })
+    }
+}
 
-        def sleep(duration: FiniteDuration): WriterT[F, L, Unit] =
-        WriterT.liftF(timer.sleep(duration))
+@instance(Timer::class)
+interface WriterTTimer<F, L> : Timer<WriterTPartialOf<F, L>> {
+
+    fun AF(): Applicative<F>
+
+    fun ML(): Monoid<L>
+
+    fun TF(): Timer<F>
+
+    fun CF(): Clock<F>
+
+    override fun clock(): Clock<WriterTPartialOf<F, L>> = object : WriterTClock<F, L> {
+        override fun AF(): Applicative<F> = AF()
+
+        override fun ML(): Monoid<L> = ML()
+
+        override fun clock(): Clock<F> = CF()
     }
 
-    /**
-     * Derives a [[Timer]] instance for `cats.data.StateT`,
-     * given we have one for `F[_]`.
-     */
-    implicit def deriveStateT[F[_], S](implicit F: Applicative[F], timer: Timer[F]): Timer[StateT[F, S, ?]] =
-    new Timer[StateT[F, S, ?]] {
-        val clock: Clock[StateT[F, S, ?]] = Clock.deriveStateT
+    override fun sleep(duration: FiniteDuration): WriterT<F, L, Unit> = AF().run {
+        WriterT(TF().sleep(duration).map { v -> Tuple2(ML().empty(), v) })
+    }
+}
 
-        def sleep(duration: FiniteDuration): StateT[F, S, Unit] =
-        StateT.liftF(timer.sleep(duration))
+@instance(Timer::class)
+interface StateTTimer<F, S> : Timer<StateTPartialOf<F, S>> {
+
+    fun MF(): Monad<F>
+
+    fun TF(): Timer<F>
+
+    fun CF(): Clock<F>
+
+    override fun clock(): Clock<StateTPartialOf<F, S>> = object : StateTClock<F, S> {
+        override fun MF(): Monad<F> = MF()
+
+        override fun clock(): Clock<F> = CF()
     }
 
-    /**
-     * Derives a [[Timer]] instance for `cats.data.Kleisli`,
-     * given we have one for `F[_]`.
-     */
-    implicit def deriveKleisli[F[_], R](implicit timer: Timer[F]): Timer[Kleisli[F, R, ?]] =
-    new Timer[Kleisli[F, R, ?]] {
-        val clock: Clock[Kleisli[F, R, ?]] = Clock.deriveKleisli
+    override fun sleep(duration: FiniteDuration): StateT<F, S, Unit> = StateT.lift(MF(), TF().sleep(duration))
+}
 
-        def sleep(duration: FiniteDuration): Kleisli[F, R, Unit] =
-        Kleisli.liftF(timer.sleep(duration))
+@instance(Timer::class)
+interface KleisliTimer<F, R> : Timer<KleisliPartialOf<F, R>> {
+
+    fun TF(): Timer<F>
+
+    fun CF(): Clock<F>
+
+    override fun clock(): Clock<KleisliPartialOf<F, R>> = object : KleisliClock<F, R> {
+        override fun clock(): Clock<F> = CF()
     }
+
+    override fun sleep(duration: FiniteDuration): Kleisli<F, R, Unit> =
+        Kleisli { TF().sleep(duration) }
 }
