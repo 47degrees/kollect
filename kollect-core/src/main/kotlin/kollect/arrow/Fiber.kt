@@ -1,16 +1,13 @@
-/*
 package arrow.effects
 
 import arrow.Kind
 import arrow.higherkind
 import arrow.instance
 import arrow.typeclasses.Applicative
-import kollect.arrow.FiberOf
-import kollect.arrow.FiberPartialOf
 
 typealias CancelToken<F> = arrow.Kind<F, Unit>
 
-*/
+
 /**
  * `Fiber` represents the (pure) result of an [[Async]] data type (e.g. [[IO]]) being started concurrently and that can
  * be either joined or canceled. You can think of fibers as being lightweight threads, a fiber being a concurrency
@@ -39,13 +36,11 @@ typealias CancelToken<F> = arrow.Kind<F, Unit>
  *     aftermath
  *   }
  * }}}
- *//*
-
+ */
 @higherkind
 abstract class Fiber<F, A> : FiberOf<F, A> {
 
-    */
-/**
+    /**
      * Triggers the cancellation of the fiber.
      *
      * Returns a new task that will trigger the cancellation upon
@@ -56,26 +51,21 @@ abstract class Fiber<F, A> : FiberOf<F, A> {
      * Note that if the background process that's evaluating the result
      * of the underlying fiber is already complete, then there's nothing
      * to cancel.
-     *//*
-
+     */
     abstract fun cancel(): CancelToken<F>
 
-    */
-/**
+    /**
      * Returns a new task that will await for the completion of the
      * underlying fiber, (asynchronously) blocking the current run-loop
      * until that result is available.
-     *//*
-
+     */
     abstract fun join(): arrow.Kind<F, A>
 
     companion object {
 
-        */
-/**
+        /**
          * Given a `join` and `cancel` tuple, builds a [[Fiber]] value.
-         *//*
-
+         */
         fun <F, A> just(join: arrow.Kind<F, A>, cancel: CancelToken<F>): Fiber<F, A> =
             Tuple(join, cancel)
 
@@ -93,18 +83,12 @@ interface FiberApplicative<F> : Applicative<FiberPartialOf<F>> {
 
     override fun <A> just(a: A): Kind<FiberPartialOf<F>, A> = Fiber(CF.just(a), CF.unit())
 }
-
-*/
 /*
-
 private abstract class FiberInstances {
 
     fun <F> fiberApplicative(CF: Concurrent<F>): Applicative<FiberKindPartial<F>> = object : Applicative<FiberKindPartial<F>> {
         final override def pure [A](x: A): Fiber[F, A] =
         Fiber(F.pure(x), F.unit)
-
-
-
 
         final override def ap [A, B](ff: Fiber[ F, A => B])(fa: Fiber[F, A]): Fiber[F, B] =
         map2(ff, fa)(_(_))
@@ -130,5 +114,6 @@ private abstract class FiberInstances {
     implicit def fiberMonoid[F[_]: Concurrent, M[_], A: Monoid]: Monoid[Fiber[F, A]] =
     Applicative.monoid[Fiber[F, ?], A]
 }
-*//*
+
+*/
 

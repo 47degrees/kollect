@@ -41,11 +41,13 @@ sealed class KollectStatus {
 }
 
 // Kollect errors
-sealed class KollectException : NoStackTrace() {
+sealed class KollectException {
     abstract val environment: Env
 
-    data class MissingIdentity(val i: Any, val request: KollectQuery<Any, Any>, override val environment: Env) : KollectException()
+    data class MissingIdentity<I : Any, A>(val i: I, val request: KollectQuery<I, A>, override val environment: Env) : KollectException()
     data class UnhandledException(val e: Throwable, override val environment: Env) : KollectException()
+
+    fun toException() = NoStackTrace()
 }
 
 // In-progress request
@@ -180,22 +182,27 @@ sealed class Kollect<F, A> : KollectOf<F, A> {
         fun <F, A> error(AF: Applicative<F>, e: Throwable): Kollect<F, A> = exception(AF) { env -> KollectException.UnhandledException(e, env) }
 
         @Suppress("UNCHECKED_CAST")
-        inline operator fun <F, I : Any, A> invoke(AF: Async<F>, id: I, ds: DataSource<I, A>): Kollect<F, A> =
-            Unkollect<F, A>(AF.binding {
-                val deferred = DeferredK.just(KollectStatus.KollectDone(Unit))
+        operator fun <F, I : Any, A> invoke(AF: Async<F>, id: I, ds: DataSource<I, A>): Kollect<F, A> =
+            Unkollect(AF.binding {
+                var deferred: DeferredK<Kind<F, KollectStatus>>? = null //= DeferredK.just(AF.just(KollectStatus.KollectMissing))
                 val request = KollectQuery.KollectOne(id, ds)
-                val result = deferred
+                val result = { a: KollectStatus ->
+                    deferred = DeferredK.just(AF.just(a)).also { AF.just(Unit) }
+                }
 
-                val blocked = BlockedRequest<F>(request, result)
                 val anyDs = ds as DataSource<Any, Any>
-                val blockedRequest = RequestMap<F>(mapOf(anyDs to blocked))
 
-                KollectResult.Blocked(blockedRequest, Unkollect<F, A>(
-                    deferred.get().flatMap {
-                        case FetchDone (a: A) =>
-                        Applicative[F].pure(KollectResult.Done(a))
-                        case FetchMissing () =>
-                        Applicative[F].pure(KollectResult.Throw((env) => MissingIdentity (id, request, env)))
+                val blocked = BlockedRequest(request, result)
+                val blockedRequest = RequestMap(mapOf(anyDs to blocked))
+
+                KollectResult.Blocked(blockedRequest, Unkollect(
+                    deferred.await().flatMap {
+                        when (it) {
+                            is KollectStatus.KollectDone<*> -> AF.just(KollectResult.Done<F, A>(it.result as A))
+                            is KollectStatus.KollectMissing -> AF.just(KollectResult.Throw<F, A> { env ->
+                                KollectException.MissingIdentity(id, request, env)
+                            })
+                        }
                     }
                 ))
             })

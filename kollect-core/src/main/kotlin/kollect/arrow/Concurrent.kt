@@ -1,36 +1,36 @@
-/*
 package arrow.effects
 
+import arrow.Kind
 import arrow.core.Either
 import arrow.core.None
 import arrow.core.Option
+import arrow.core.Some
 import arrow.core.Tuple2
+import arrow.data.EitherTPartialOf
 import arrow.effects.typeclasses.Async
+import arrow.instance
+import kollect.arrow.Promise
 import kollect.arrow.concurrent.FiniteDuration
 import kollect.arrow.concurrent.Ref
 import kollect.arrow.effects.Timer
+import java.util.concurrent.TimeoutException
 
-*/
 /**
  * Type class for [[Async]] data types that are cancelable and can be started concurrently.
- *//*
-
+ */
 interface Concurrent<F> : Async<F> {
 
-    */
-/**
+    /**
      * Start concurrent execution of the source suspended in
      * the `F` context.
      *
      * Returns a [[Fiber]] that can be used to either join or cancel
      * the running computation, being similar in spirit (but not
      * in implementation) to starting a thread.
-     *//*
-
+     */
     fun <A> start(fa: arrow.Kind<F, A>): arrow.Kind<F, Fiber<F, A>>
 
-    */
-/**
+    /**
      * Run two tasks concurrently, creating a race between them and returns a
      * pair containing both the winner's successful value and the loser
      * represented as a still-unfinished fiber.
@@ -55,12 +55,11 @@ interface Concurrent<F> : Async<F> {
      *
      * See [[race]] for a simpler version that cancels the loser
      * immediately.
-     *//*
+     */
 
     fun <A, B> racePair(fa: arrow.Kind<F, A>, fb: arrow.Kind<F, B>): arrow.Kind<F, Either<Tuple2<A, Fiber<F, B>>, Tuple2<Fiber<F, A>, B>>>
 
-    */
-/**
+    /**
      * Run two tasks concurrently and return the first to finish,
      * either in success or error. The loser of the race is canceled.
      *
@@ -71,7 +70,7 @@ interface Concurrent<F> : Async<F> {
      *
      * Also see [[racePair]] for a version that does not cancel
      * the loser automatically on successful results.
-     *//*
+     */
 
     fun <A, B> race(fa: arrow.Kind<F, A>, fb: arrow.Kind<F, B>): arrow.Kind<F, Either<A, B>> =
         racePair(fa, fb).flatMap { either ->
@@ -81,8 +80,7 @@ interface Concurrent<F> : Async<F> {
             }
         }
 
-    */
-/**
+    /**
      * Creates a cancelable `F[A]` instance that executes an
      * asynchronous process on evaluation.
      *
@@ -115,15 +113,14 @@ interface Concurrent<F> : Async<F> {
      *     }
      *   }
      * }}}
-     *//*
+     */
 
     fun <A> cancelable(k: ((Either<Throwable, A>) -> Unit) -> CancelToken<F>): arrow.Kind<F, A> =
         Concurrent.defaultCancelable(k)(this)
 
     // TODO uncomment when we can add this data type to Arrow. IO.Pure, IO.RaiseError and the rest of the
     // TODO implementations of the sealed class IO are internal in Arrow.
-    */
-/**
+    /**
      * Inherited from [[LiftIO]], defines a conversion from [[IO]]
      * in terms of the `Concurrent` type class.
      *
@@ -138,26 +135,22 @@ interface Concurrent<F> : Async<F> {
 
     */
 /*override def liftIO[A](ioa: IO[A]): F[A] =
-    Concurrent.liftIO(ioa)(this)*//*
+    Concurrent.liftIO(ioa)(this)*/
 
 
     companion object {
         // TODO uncomment when we can add this data type to Arrow. IO.Pure, IO.RaiseError and the rest of the
         // TODO implementations of the sealed class IO are internal in Arrow.
-*/
-/*
-        *//*
-*/
-/**
+
+        /**
          * Lifts any `IO` value into any data type implementing [[Concurrent]].
          *
          * Compared with [[Async.liftIO]], this version preserves the
          * interruptibility of the given `IO` value.
          *
          * This is the default `Concurrent.liftIO` implementation.
-         *//*
-*/
-/*
+         */
+        /*
         def liftIO[F[_], A](ioa: IO[A])(implicit F: Concurrent[F]): F[A] =
         ioa match {
             case Pure(a) => F.pure(a)
@@ -173,11 +166,9 @@ interface Concurrent<F> : Async<F> {
                 }
             }
         }
-        *//*
-
-
         */
-/**
+
+        /**
          * Returns an effect that either completes with the result of the source within
          * the specified time `duration` or otherwise evaluates the `fallback`.
          *
@@ -191,8 +182,7 @@ interface Concurrent<F> : Async<F> {
          *
          * @param fallback is the task evaluated after the duration has passed and
          *        the source canceled
-         *//*
-
+         */
         fun <F, A> timeoutTo(
             CF: Concurrent<F>,
             timer: Timer<F>,
@@ -203,39 +193,32 @@ interface Concurrent<F> : Async<F> {
             CF.race(fa, timer.sleep(duration)).flatMap {
                 when (it) {
                     is Either.Left -> CF.just(it.a)
-                    is Either.Right ->fallback
+                    is Either.Right -> fallback
                 }
             }
         }
 
-        */
-/**
+        /**
          * Lazily memoizes `f`. For every time the returned `F[F[A]]` is
          * bound, the effect `f` will be performed at most once (when the
          * inner `F[A]` is bound the first time).
          *
          * Note: `start` can be used for eager memoization.
-         *//*
-
-        fun <F, A> memoize(CF: Concurrent<F>, f: arrow.Kind<F, A>): arrow.Kind<F, arrow.Kind<F, A>> =
-        Ref.of<F, Option<Deferred<F, Either<Throwable, A>>>>(None).map {
-            ref =>
-            Deferred[F, Either[Throwable, A]].flatMap {
-                d =>
-                ref
-                    .modify {
-                        case None =>
-                        Some(d) -> f.attempt.flatTap(d.complete)
-                        case s @ Some(other) =>
-                        s -> other.get
-                    }
-                    .flatten
-                    .rethrow
+         */
+        fun <F, A> memoize(CF: Concurrent<F>, f: arrow.Kind<F, A>): arrow.Kind<F, arrow.Kind<F, A>> = CF.run {
+            Ref.of<F, Option<Deferred<F, Either<Throwable, A>>>>(CF, None).map { ref ->
+                Deferred<F, Either<Throwable, A>>(CF).flatMap { d ->
+                    ref.modify { option ->
+                        when (option) {
+                            is None -> Tuple2(Some(d), f.attempt().flatMap { a -> d.complete(a).map { a } })
+                            is Some -> Tuple2(option, option.t.get())
+                        }
+                    }.flatten().flatMap { either -> either.fold({ CF.raiseError<A>(it) }, { just(it) }) }
+                }
             }
         }
 
-        */
-/**
+        /**
          * Returns an effect that either completes with the result of the source within
          * the specified time `duration` or otherwise raises a `TimeoutException`.
          *
@@ -245,23 +228,31 @@ interface Concurrent<F> : Async<F> {
          * @param duration is the time span for which we wait for the source to
          *        complete; in the event that the specified time has passed without
          *        the source completing, a `TimeoutException` is raised
-         *//*
+         */
+        fun <F, A> timeout(CF: Concurrent<F>, TF: Timer<F>, fa: Kind<F, A>, duration: FiniteDuration): Kind<F, A> =
+            timeoutTo(CF, TF, fa, duration, CF.raiseError(TimeoutException(duration.toString())))
 
-        def timeout[F[_], A](fa: F[A], duration: FiniteDuration)(implicit F: Concurrent[F], timer: Timer[F]): F[A] =
-        timeoutTo(fa, duration, F.raiseError(new TimeoutException(duration.toString)))
-
-        */
-/**
-         * [[Concurrent]] instance built for `cats.data.EitherT` values initialized
-         * with any `F` data type that also implements `Concurrent`.
-         *//*
-
-        implicit def catsEitherTConcurrent[F[_]: Concurrent, L]: Concurrent[EitherT[F, L, ?]] =
-        new EitherTConcurrent[F, L]
-        { def F = Concurrent [F] }
-
-        */
-/**
+        /**
+         * Internal API — Cancelable builder derived from
+         * [[Async.asyncF]] and [[Bracket.bracketCase]].
+         */
+        private fun <F, A> defaultCancelable(AF: Async<F>, k: ((Either<Throwable, A>) -> Unit) -> CancelToken<F>): Kind<F, A> =
+            AF.async { cb ->
+                val latch = Promise[Unit]()
+                val latchF = AF.async<Unit> { cb -> latch.future.onComplete(_ => cb(rightUnit))(immediate) }
+                // Side-effecting call; unfreezes latch in order to allow bracket to finish
+                val token = k { result =>
+                    latch.complete(successUnit)
+                    cb(result)
+                }
+                F.bracketCase(F.pure(token))(_ => latchF) {
+                case (cancel, Canceled) => cancel
+                case _ => F.unit
+            }
+        }
+        }
+    }
+        /**
          * [[Concurrent]] instance built for `cats.data.OptionT` values initialized
          * with any `F` data type that also implements `Concurrent`.
          *//*
@@ -271,7 +262,7 @@ interface Concurrent<F> : Async<F> {
         { def F = Concurrent [F] }
 
         */
-/**
+        /**
          * [[Concurrent]] instance built for `cats.data.Kleisli` values initialized
          * with any `F` data type that also implements `Concurrent`.
          *//*
@@ -281,7 +272,7 @@ interface Concurrent<F> : Async<F> {
         { def F = Concurrent [F] }
 
         */
-/**
+        /**
          * [[Concurrent]] instance built for `cats.data.WriterT` values initialized
          * with any `F` data type that also implements `Concurrent`.
          *//*
@@ -432,7 +423,7 @@ interface Concurrent<F> : Async<F> {
         }
 
         */
-/**
+        /**
          * Internal API — Cancelable builder derived from
          * [[Async.asyncF]] and [[Bracket.bracketCase]].
          *//*

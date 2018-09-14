@@ -80,7 +80,3 @@ interface BlockContext {
         }
     }
 }
-
-sealed class CanAwait {
-    object AwaitPermission : CanAwait()
-}
