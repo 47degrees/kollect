@@ -1,10 +1,19 @@
 package arrow.effects
 
 import arrow.Kind
+import arrow.concurrent.Promise
+import arrow.core.Either
+import arrow.core.Failure
+import arrow.core.Left
+import arrow.core.None
+import arrow.core.Option
+import arrow.core.Right
+import arrow.core.Success
+import arrow.core.some
+import arrow.effects.Deferred.Companion.Id
 import arrow.effects.typeclasses.Async
-import arrow.effects.typeclasses.MonadDefer
-import arrow.higherkind
-import arrow.instance
+import kollect.arrow.ExecutionContext
+import kollect.arrow.TrampolineEC
 import java.util.concurrent.atomic.AtomicReference
 
 /**
@@ -102,7 +111,7 @@ abstract class Deferred<F, A> {
             UncancelabbleDeferred<F, A>(Promise<A>())
 
 
-        private final class Id
+        class Id
 
         sealed class State<A> {
             data class Set<A>(val a: A) : State<A>()
@@ -111,84 +120,75 @@ abstract class Deferred<F, A> {
     }
 }
 
-class ConcurrentDeferred<F, A>(val AF: MonadDefer<F>, val ref: AtomicReference<Deferred.Companion.State<A>>) : Deferred<F, A>() {
+class ConcurrentDeferred<F, A>(val AF: Concurrent<F>, val ref: AtomicReference<Deferred.Companion.State<A>>) : Deferred<F, A>() {
 
     override fun get(): Kind<F, A> = AF.defer {
         val refValue = ref.get()
         when (refValue) {
             is Companion.State.Set<A> -> AF.just(refValue.a)
-            is Companion.State.Unset<A> -> AF.cancelable {
-                cb =>
+            is Companion.State.Unset<A> -> AF.cancelable { cb ->
                 val id = unsafeRegister(cb)
-                @tailrec
-                def unregister (): Unit =
-                ref.get match {
-                    case State . Set (_) => ()
-                    case s @ State.Unset(waiting) =>
-                    val updated = State.Unset(waiting - id)
-                    if (ref.compareAndSet(s, updated)) ()
-                    else unregister()
+
+                fun unregister(): Unit = ref.get().let { reference ->
+                    when (reference) {
+                        is Companion.State.Set -> Unit
+                        is Companion.State.Unset -> {
+                            val updated = Companion.State.Unset(reference.waiting - id)
+                            if (ref.compareAndSet(reference, updated)) Unit
+                            else unregister()
+                        }
+                    }
                 }
-                F.delay(unregister())
+                AF.defer { AF.just(unregister()) }
             }
         }
     }
 
-    private[this] def unsafeRegister(cb: Either[ Throwable, A] => Unit): Id = {
-    val id = new Id
+    private fun unsafeRegister(cb: (Either<Throwable, A>) -> Unit): Id {
+        val id = Id()
 
-        @tailrec
-        def register (): Option[A] =
-    ref.get match {
-        case State . Set (a) => Some(a)
-        case s @ State.Unset(waiting) =>
-        val updated = State.Unset(waiting.updated(id, (a: A) => cb (Right(a))))
-        if (ref.compareAndSet(s, updated)) None
-        else register()
-    }
-
-    register().foreach(a => cb (Right(a)))
-    id
-}
-
-    def complete (a: A): F[Unit] = {
-    def notifyReaders (r: State.Unset[A]): Unit =
-    r.waiting.values.foreach {
-        cb =>
-        cb(a)
-    }
-
-    @tailrec
-    def loop (): Unit =
-    ref.get match {
-        case State . Set (_) => throw new IllegalStateException("Attempting to complete a Deferred that has already been completed")
-        case s @ State.Unset(_) =>
-        if (ref.compareAndSet(s, State.Set(a))) notifyReaders(s)
-        else loop()
-    }
-
-    F.delay(loop())
-}
-
-/*
-
-}
-
-private final class UncancelabbleDeferred[F[_], A](p: Promise[A])(implicit F: Async[F]) extends Deferred[F, A]
-{
-    def get : F [A] =
-        F.async {
-            cb =>
-            implicit
-            val ec: ExecutionContext = TrampolineEC.immediate
-            p.future.onComplete {
-                case Success (a) => cb(Right(a))
-                case Failure (t) => cb(Left(t))
+        fun register(): Option<A> = ref.get().let { reference ->
+            when (reference) {
+                is Companion.State.Set -> reference.a.some()
+                is Companion.State.Unset -> {
+                    val mapClone = (reference.waiting.clone() as LinkedHashMap<Id, (A) -> Unit>)
+                    mapClone[id] = { a: A -> cb(Right(a)) }
+                    val updated = Companion.State.Unset(mapClone)
+                    if (ref.compareAndSet(reference, updated)) None
+                    else register()
+                }
             }
         }
 
-    def complete (a: A): F[Unit] =
-    F.delay(p.success(a))
+        register().fold({ Unit }, { a -> cb(Right(a)) })
+        return id
+    }
+
+    override fun complete(a: A): Kind<F, Unit> {
+        fun notifyReaders(r: Companion.State.Unset<A>): Unit = r.waiting.values.forEach { cb -> cb(a) }
+
+        fun loop(): Unit = ref.get().let { reference ->
+            when (reference) {
+                is Companion.State.Set -> throw IllegalStateException("Attempting to complete a Deferred that has already been completed")
+                is Companion.State.Unset -> if (ref.compareAndSet(reference, Companion.State.Set(a))) notifyReaders(reference)
+                else loop()
+            }
+        }
+
+        return AF.defer { AF.just(loop()) }
+    }
 }
+
+private class UncancelabbleDeferred<F, A>(val AF: Async<F>, val p: Promise<A>) : Deferred<F, A>() {
+    override fun get(): Kind<F, A> = AF.async { cb ->
+        val ec: ExecutionContext = TrampolineEC.immediate
+        p.future().onComplete(ec) {
+            when (it) {
+                is Success -> cb(Right(it.value))
+                is Failure -> cb(Left(it.exception))
+            }
+        }
+    }
+
+    override fun complete(a: A): Kind<F, Unit> = AF.defer { AF.just(Unit).also { p.success(a) } }
 }
-}*/

@@ -5,12 +5,12 @@ import arrow.concurrent.Promise
 import arrow.core.Either
 import arrow.core.None
 import arrow.core.Option
+import arrow.core.Right
 import arrow.core.Some
+import arrow.core.Success
 import arrow.core.Tuple2
-import arrow.data.EitherTPartialOf
 import arrow.effects.typeclasses.Async
-import arrow.instance
-import kollect.arrow.ExecutionContext
+import kollect.arrow.TrampolineEC.Companion.immediate
 import kollect.arrow.concurrent.FiniteDuration
 import kollect.arrow.concurrent.Ref
 import kollect.arrow.effects.Timer
@@ -115,7 +115,6 @@ interface Concurrent<F> : Async<F> {
      *   }
      * }}}
      */
-
     fun <A> cancelable(k: ((Either<Throwable, A>) -> Unit) -> CancelToken<F>): arrow.Kind<F, A> =
         Concurrent.defaultCancelable(this, k)
 
@@ -235,21 +234,26 @@ interface Concurrent<F> : Async<F> {
          * Internal API — Cancelable builder derived from
          * [[Async.asyncF]] and [[Bracket.bracketCase]].
          */
-        private fun <F, A> defaultCancelable(executor: ExecutionContext, AF: Async<F>, k: ((Either<Throwable, A>) -> Unit) -> CancelToken<F>): Kind<F, A> =
+        private fun <F, A> defaultCancelable(AF: Async<F>, k: ((Either<Throwable, A>) -> Unit) -> CancelToken<F>): Kind<F, A> =
             AF.async { cb ->
+
                 val latch = Promise<Unit>()
-                val latchF = AF.async<Unit> { cb -> latch.future().onComplete(executor, { cb(rightUnit))(immediate) } }
+                val latchF = AF.async<Unit> { cb -> latch.future().onComplete(immediate) { cb(Right(Unit)) } }
                 // Side-effecting call; unfreezes latch in order to allow bracket to finish
-                val token = k { result =>
-                    latch.complete(successUnit)
+
+                val token = k { result ->
+                    latch.complete(Success(Unit))
                     cb(result)
                 }
-                F.bracketCase(F.pure(token))(_ => latchF) {
+                AF.bracketCase(AF.just(token))(_ => latchF) {
                 case (cancel, Canceled) => cancel
                 case _ => F.unit
             }
         }
         }
+
+    // def async[A](k: (Either[Throwable, A] => Unit) => Unit): F[A]
+    // def asyncF[A](k: (Either[Throwable, A] => Unit) => F[Unit]): F[A]
     }
         /**
          * [[Concurrent]] instance built for `cats.data.OptionT` values initialized

@@ -7,6 +7,7 @@ import arrow.core.getOrElse
 import arrow.core.toOption
 import arrow.data.NonEmptyList
 import arrow.data.foldLeft
+import arrow.effects.Deferred
 import arrow.effects.DeferredK
 import arrow.effects.typeclasses.Async
 import arrow.higherkind
@@ -184,19 +185,15 @@ sealed class Kollect<F, A> : KollectOf<F, A> {
         @Suppress("UNCHECKED_CAST")
         operator fun <F, I : Any, A> invoke(AF: Async<F>, id: I, ds: DataSource<I, A>): Kollect<F, A> =
             Unkollect(AF.binding {
-                var deferred: DeferredK<Kind<F, KollectStatus>>? = null //= DeferredK.just(AF.just(KollectStatus.KollectMissing))
+                val deferred = Deferred<F, KollectStatus>(AF)
                 val request = KollectQuery.KollectOne(id, ds)
-                val result = { a: KollectStatus ->
-                    deferred = DeferredK.just(AF.just(a)).also { AF.just(Unit) }
-                }
-
-                val anyDs = ds as DataSource<Any, Any>
-
+                val result = { a: KollectStatus -> deferred.complete(a) }
                 val blocked = BlockedRequest(request, result)
-                val blockedRequest = RequestMap(mapOf(anyDs to blocked))
+                val anyDs = ds as DataSource<Any, Any>
+                val blockedRequest = RequestMap<F>(mapOf(anyDs to blocked))
 
-                KollectResult.Blocked(blockedRequest, Unkollect(
-                    deferred.await().flatMap {
+                KollectResult.Blocked(blockedRequest, Unkollect<F, A>(
+                    deferred.get().flatMap {
                         when (it) {
                             is KollectStatus.KollectDone<*> -> AF.just(KollectResult.Done<F, A>(it.result as A))
                             is KollectStatus.KollectMissing -> AF.just(KollectResult.Throw<F, A> { env ->
