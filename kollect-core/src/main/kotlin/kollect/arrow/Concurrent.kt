@@ -10,7 +10,7 @@ import arrow.core.Tuple2
 import arrow.data.EitherTPartialOf
 import arrow.effects.typeclasses.Async
 import arrow.instance
-import kollect.arrow.Promise
+import kollect.arrow.ExecutionContext
 import kollect.arrow.concurrent.FiniteDuration
 import kollect.arrow.concurrent.Ref
 import kollect.arrow.effects.Timer
@@ -235,10 +235,10 @@ interface Concurrent<F> : Async<F> {
          * Internal API — Cancelable builder derived from
          * [[Async.asyncF]] and [[Bracket.bracketCase]].
          */
-        private fun <F, A> defaultCancelable(AF: Async<F>, k: ((Either<Throwable, A>) -> Unit) -> CancelToken<F>): Kind<F, A> =
+        private fun <F, A> defaultCancelable(executor: ExecutionContext, AF: Async<F>, k: ((Either<Throwable, A>) -> Unit) -> CancelToken<F>): Kind<F, A> =
             AF.async { cb ->
                 val latch = Promise<Unit>()
-                val latchF = AF.async<Unit> { cb -> latch.future.onComplete(_ => cb(rightUnit))(immediate) }
+                val latchF = AF.async<Unit> { cb -> latch.future().onComplete(executor, { cb(rightUnit))(immediate) } }
                 // Side-effecting call; unfreezes latch in order to allow bracket to finish
                 val token = k { result =>
                     latch.complete(successUnit)

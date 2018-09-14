@@ -5,6 +5,7 @@ import arrow.core.Success
 import arrow.core.Try
 import kollect.arrow.DefaultPromise
 import kollect.arrow.Future
+import kollect.arrow.KeptPromise
 
 /** Promise is an object which can be completed with a value or failed
  *  with an exception.
@@ -64,7 +65,7 @@ interface Promise<T> {
      */
     fun tryCompleteWith(other: Future<T>): Promise<T> {
         if (other != this.future()) { // this tryCompleteWith this doesn't make much sense
-            other.onComplete(Future.InternalCallbackExecutor) { tryComplete(it) }
+            other.onComplete(Future.Companion.InternalCallbackExecutor) { tryComplete(it) }
         }
         return this
     }
@@ -130,7 +131,6 @@ interface Promise<T> {
          *  @tparam T       the type of the value in the promise
          *  @return         the newly created `Promise` object
          */
-        fun <T> fromTry(result: Try<T>): Promise<T> = impl.Promise.KeptPromise<T>(result)
+        fun <T> fromTry(result: Try<T>): Promise<T> = KeptPromise(result)
     }
 }
-

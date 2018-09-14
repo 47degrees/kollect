@@ -1,6 +1,7 @@
 package kollect.arrow
 
 import arrow.concurrent.Awaitable
+import arrow.concurrent.BatchingExecutor
 import arrow.concurrent.CanAwait
 import arrow.concurrent.Promise
 import arrow.core.Failure
@@ -65,9 +66,9 @@ interface Future<out T> : Awaitable<T> {
                 throw TimeoutException("Future timed out after [$atMost]")
             }
 
-            override fun <U> onSuccess(executor: ExecutionContext, pf: PartialFunction<Nothing, U>): Unit = Unit
-            override fun <U> onFailure(executor: ExecutionContext, pf: PartialFunction<Throwable, U>) = Unit
-            override fun <U> onComplete(executor: ExecutionContext, f: (Try<Nothing>) -> U) = Unit
+            override fun <U : Any> onSuccess(executor: ExecutionContext, pf: PartialFunction<Nothing, U>): Unit = Unit
+            override fun <U : Any> onFailure(executor: ExecutionContext, pf: PartialFunction<Throwable, U>) = Unit
+            override fun <U : Any> onComplete(executor: ExecutionContext, f: (Try<Nothing>) -> U) = Unit
             override fun isCompleted(): Boolean = false
             override fun value(): Option<Try<Nothing>> = None
             override fun failed(executor: ExecutionContext): Future<Throwable> = this
@@ -315,7 +316,7 @@ interface Future<out T> : Awaitable<T> {
      * @group Callbacks
      */
     @Deprecated("use `foreach` or `onComplete` instead (keep in mind that they take total rather than partial functions)")
-    fun <U> onSuccess(executor: ExecutionContext, pf: PartialFunction<T, U>): Unit = onComplete(executor) {
+    fun <U : Any> onSuccess(executor: ExecutionContext, pf: PartialFunction<T, U>): Unit = onComplete(executor) {
         when (it) {
             is Success -> pf.invokeOrElse(it.value, it) // Exploiting the cached function to avoid MatchError
             else -> {
@@ -342,7 +343,7 @@ interface Future<out T> : Awaitable<T> {
      * @group Callbacks
      */
     @Deprecated("use `onComplete` or `failed.foreach` instead (keep in mind that they take total rather than partial functions)")
-    fun <U> onFailure(executor: ExecutionContext, pf: PartialFunction<Throwable, U>): Unit = onComplete(executor) {
+    fun <U : Any> onFailure(executor: ExecutionContext, pf: PartialFunction<Throwable, U>): Unit = onComplete(executor) {
         when (it) {
             is Failure -> pf.invokeOrElse(it.exception, it) // Exploiting the cached function to avoid MatchError
             else -> {
@@ -366,7 +367,7 @@ interface Future<out T> : Awaitable<T> {
      * @param f     the function to be executed when this `Future` completes
      * @group Callbacks
      */
-    fun <U> onComplete(executor: ExecutionContext, f: (Try<T>) -> U): Unit
+    fun <U: Any> onComplete(executor: ExecutionContext, f: (Try<T>) -> U): Unit
 
     /* Miscellaneous */
 

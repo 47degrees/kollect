@@ -1,6 +1,6 @@
-package kollect.arrow
+package arrow.concurrent
 
-import arrow.concurrent.CanAwait
+import kollect.arrow.OnCompleteRunnable
 import kollect.arrow.concurrent.BlockContext
 import java.util.concurrent.Executor
 

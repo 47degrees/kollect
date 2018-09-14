@@ -1,8 +1,10 @@
 package kollect.arrow
 
+import arrow.concurrent.CanAwait
 import arrow.core.Option
 import arrow.core.getOrElse
 import arrow.core.toOption
+import kollect.arrow.concurrent.BlockContext
 import java.util.concurrent.Callable
 import java.util.concurrent.Executor
 import java.util.concurrent.ExecutorService
