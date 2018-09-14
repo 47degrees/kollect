@@ -1,5 +1,10 @@
-package kollect.arrow
+package arrow.concurrent
 
+import arrow.core.Failure
+import arrow.core.Success
+import arrow.core.Try
+import kollect.arrow.DefaultPromise
+import kollect.arrow.Future
 
 /** Promise is an object which can be completed with a value or failed
  *  with an exception.
@@ -19,7 +24,7 @@ package kollect.arrow
 interface Promise<T> {
     /** Future containing the value of this promise.
      */
-    fun future: Future[T]
+    fun future(): Future<T>
 
     /** Returns whether the promise has already been completed with
      *  a value or an exception.
@@ -28,16 +33,16 @@ interface Promise<T> {
      *
      *  @return    `true` if the promise is already completed, `false` otherwise
      */
-    def isCompleted: Boolean
+    fun isCompleted(): Boolean
 
-        /** Completes the promise with either an exception or a value.
-         *
-         *  @param result     Either the value or the exception to complete the promise with.
-         *
-         *  $promiseCompletion
-         */
-        def complete(result: Try[T]): this.type =
-    if (tryComplete(result)) this else throw new IllegalStateException("Promise already completed.")
+    /** Completes the promise with either an exception or a value.
+     *
+     *  @param result     Either the value or the exception to complete the promise with.
+     *
+     *  $promiseCompletion
+     */
+    fun complete(result: Try<T>): Promise<T> =
+        if (tryComplete(result)) this else throw IllegalStateException("Promise already completed.")
 
     /** Tries to complete the promise with either a value or the exception.
      *
@@ -45,23 +50,23 @@ interface Promise<T> {
      *
      *  @return    If the promise has already been completed returns `false`, or `true` otherwise.
      */
-    def tryComplete(result: Try[T]): Boolean
+    fun tryComplete(result: Try<T>): Boolean
 
     /** Completes this promise with the specified future, once that future is completed.
      *
      *  @return   This promise
      */
-    final def completeWith(other: Future[T]): this.type = tryCompleteWith(other)
+    fun completeWith(other: Future<T>): Promise<T> = tryCompleteWith(other)
 
     /** Attempts to complete this promise with the specified future, once that future is completed.
      *
      *  @return   This promise
      */
-    final def tryCompleteWith(other: Future[T]): this.type = {
-        if (other ne this.future) { // this tryCompleteWith this doesn't make much sense
-            other.onComplete(this tryComplete _)(Future.InternalCallbackExecutor)
+    fun tryCompleteWith(other: Future<T>): Promise<T> {
+        if (other != this.future()) { // this tryCompleteWith this doesn't make much sense
+            other.onComplete(Future.InternalCallbackExecutor) { tryComplete(it) }
         }
-        this
+        return this
     }
 
     /** Completes the promise with a value.
@@ -70,61 +75,62 @@ interface Promise<T> {
      *
      *  $promiseCompletion
      */
-    def success(@deprecatedName('v) value: T): this.type = complete(Success(value))
+    fun success(value: T): Promise<T> = complete(Success(value))
 
-        /** Tries to complete the promise with a value.
-         *
-         *  $nonDeterministic
-         *
-         *  @return    If the promise has already been completed returns `false`, or `true` otherwise.
-         */
-        def trySuccess(value: T): Boolean = tryComplete(Success(value))
+    /** Tries to complete the promise with a value.
+     *
+     *  $nonDeterministic
+     *
+     *  @return    If the promise has already been completed returns `false`, or `true` otherwise.
+     */
+    fun trySuccess(value: T): Boolean = tryComplete(Success(value))
 
-        /** Completes the promise with an exception.
-         *
-         *  @param cause    The throwable to complete the promise with.
-         *
-         *  $allowedThrowables
-         *
-         *  $promiseCompletion
-         */
-        def failure(@deprecatedName('t) cause: Throwable): this.type = complete(Failure(cause))
+    /** Completes the promise with an exception.
+     *
+     *  @param cause    The throwable to complete the promise with.
+     *
+     *  $allowedThrowables
+     *
+     *  $promiseCompletion
+     */
+    fun failure(cause: Throwable): Promise<T> = complete(Failure(cause))
 
-        /** Tries to complete the promise with an exception.
+    /** Tries to complete the promise with an exception.
+     *
+     *  $nonDeterministic
+     *
+     *  @return    If the promise has already been completed returns `false`, or `true` otherwise.
+     */
+    fun tryFailure(cause: Throwable): Boolean = tryComplete(Failure(cause))
+
+    companion object {
+        /** Creates a promise object which can be completed with a value.
          *
-         *  $nonDeterministic
-         *
-         *  @return    If the promise has already been completed returns `false`, or `true` otherwise.
+         *  @tparam T       the type of the value in the promise
+         *  @return         the newly created `Promise` object
          */
-        def tryFailure(@deprecatedName('t) cause: Throwable): Boolean = tryComplete(Failure(cause))
+        operator fun <T> invoke(): Promise<T> = DefaultPromise()
+
+        /** Creates an already completed Promise with the specified exception.
+         *
+         *  @tparam T       the type of the value in the promise
+         *  @return         the newly created `Promise` object
+         */
+        fun <T> failed(exception: Throwable): Promise<T> = fromTry(Failure(exception))
+
+        /** Creates an already completed Promise with the specified result.
+         *
+         *  @tparam T       the type of the value in the promise
+         *  @return         the newly created `Promise` object
+         */
+        fun <T> successful(result: T): Promise<T> = fromTry(Success(result))
+
+        /** Creates an already completed Promise with the specified result or exception.
+         *
+         *  @tparam T       the type of the value in the promise
+         *  @return         the newly created `Promise` object
+         */
+        fun <T> fromTry(result: Try<T>): Promise<T> = impl.Promise.KeptPromise<T>(result)
+    }
 }
 
-object Promise {
-    /** Creates a promise object which can be completed with a value.
-     *
-     *  @tparam T       the type of the value in the promise
-     *  @return         the newly created `Promise` object
-     */
-    def apply[T](): Promise[T] = new impl.Promise.DefaultPromise[T]()
-
-    /** Creates an already completed Promise with the specified exception.
-     *
-     *  @tparam T       the type of the value in the promise
-     *  @return         the newly created `Promise` object
-     */
-    def failed[T](exception: Throwable): Promise[T] = fromTry(Failure(exception))
-
-    /** Creates an already completed Promise with the specified result.
-     *
-     *  @tparam T       the type of the value in the promise
-     *  @return         the newly created `Promise` object
-     */
-    def successful[T](result: T): Promise[T] = fromTry(Success(result))
-
-    /** Creates an already completed Promise with the specified result or exception.
-     *
-     *  @tparam T       the type of the value in the promise
-     *  @return         the newly created `Promise` object
-     */
-    def fromTry[T](result: Try[T]): Promise[T] = impl.Promise.KeptPromise[T](result)
-}

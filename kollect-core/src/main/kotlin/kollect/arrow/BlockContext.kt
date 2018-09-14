@@ -1,5 +1,7 @@
 package kollect.arrow.concurrent
 
+import arrow.concurrent.CanAwait
+
 /**
  * A context to be notified by `scala.concurrent.blocking` when
  * a thread is about to block. In effect this trait provides

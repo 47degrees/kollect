@@ -1,6 +1,7 @@
 package arrow.effects
 
 import arrow.Kind
+import arrow.concurrent.Promise
 import arrow.core.Either
 import arrow.core.None
 import arrow.core.Option
@@ -116,7 +117,7 @@ interface Concurrent<F> : Async<F> {
      */
 
     fun <A> cancelable(k: ((Either<Throwable, A>) -> Unit) -> CancelToken<F>): arrow.Kind<F, A> =
-        Concurrent.defaultCancelable(k)(this)
+        Concurrent.defaultCancelable(this, k)
 
     // TODO uncomment when we can add this data type to Arrow. IO.Pure, IO.RaiseError and the rest of the
     // TODO implementations of the sealed class IO are internal in Arrow.
@@ -133,10 +134,8 @@ interface Concurrent<F> : Async<F> {
      * (on the object companion).
      *//*
 
+    override def liftIO[A](ioa: IO[A]): F[A] = Concurrent.liftIO(ioa)(this)
     */
-/*override def liftIO[A](ioa: IO[A]): F[A] =
-    Concurrent.liftIO(ioa)(this)*/
-
 
     companion object {
         // TODO uncomment when we can add this data type to Arrow. IO.Pure, IO.RaiseError and the rest of the
@@ -238,7 +237,7 @@ interface Concurrent<F> : Async<F> {
          */
         private fun <F, A> defaultCancelable(AF: Async<F>, k: ((Either<Throwable, A>) -> Unit) -> CancelToken<F>): Kind<F, A> =
             AF.async { cb ->
-                val latch = Promise[Unit]()
+                val latch = Promise<Unit>()
                 val latchF = AF.async<Unit> { cb -> latch.future.onComplete(_ => cb(rightUnit))(immediate) }
                 // Side-effecting call; unfreezes latch in order to allow bracket to finish
                 val token = k { result =>

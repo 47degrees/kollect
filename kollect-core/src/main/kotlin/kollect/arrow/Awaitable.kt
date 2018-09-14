@@ -11,7 +11,7 @@ import java.util.concurrent.TimeoutException
  * by blocking the current thread until the `Awaitable` has been completed or a timeout has
  * occurred.
  */
-interface Awaitable<T> {
+interface Awaitable<out T> {
 
     /**
      * Await the "completed" state of this `Awaitable`.
