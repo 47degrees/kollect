@@ -2,6 +2,9 @@ package kollect
 
 import arrow.Kind
 import arrow.core.Either
+import arrow.core.None
+import arrow.core.Option
+import arrow.core.Some
 import arrow.core.Tuple2
 import arrow.core.getOrElse
 import arrow.core.toOption
@@ -14,6 +17,9 @@ import arrow.instance
 import arrow.typeclasses.Applicative
 import arrow.typeclasses.Monad
 import arrow.typeclasses.binding
+import kollect.arrow.ContextShift
+import kollect.arrow.concurrent.Ref
+import kollect.arrow.effects.Timer
 
 // Kollect queries
 interface KollectRequest
@@ -47,7 +53,7 @@ sealed class KollectException {
     data class MissingIdentity<I : Any, A>(val i: I, val request: KollectQuery<I, A>, override val environment: Env) : KollectException()
     data class UnhandledException(val e: Throwable, override val environment: Env) : KollectException()
 
-    fun toException() = NoStackTrace()
+    fun toThrowable() = NoStackTrace()
 }
 
 // In-progress request
@@ -206,26 +212,304 @@ sealed class Kollect<F, A> : KollectOf<F, A> {
         /**
          * Run a `Kollect`, the result in the `F` monad.
          */
-        fun <F> run(): KollectRunner<F> = KollectRunner<F>
+        fun <F> run(): KollectRunner<F> = KollectRunner()
 
-        private class KollectRunner<F>(private val dummy: Boolean = true) : Any() {
-            operator fun <A> invoke(fa: Kollect<F, A>, cache: DataSourceCache<> = InMemoryCache.empty()) {
-
+        class KollectRunner<F>(private val dummy: Boolean = true) : Any() {
+            operator fun <A> invoke(
+                C: Concurrent<F>,
+                CS: ContextShift<F>,
+                T: Timer<F>,
+                fa: Kollect<F, A>,
+                cache: DataSourceCache = InMemoryCache.empty()
+            ): Kind<F, A> = C.binding {
+                val cacheRef = Ref.of(C, cache).bind()
+                val result = performRun(C, CS, T, fa, cacheRef, None).bind()
+                result
             }
-            def apply[A](
-                ,
-
-            )(
-                implicit
-                    P: Par[F],
-            C: ConcurrentEffect[F],
-            CS: ContextShift[F],
-            T: Timer[F]
-            ): F[A] = for {
-                cache <- Ref.of[F, DataSourceCache](cache)
-                result <- performRun(fa, cache, None)
-            } yield result
         }
+
+        /**
+         * Run a `Fetch`, the environment and the result in the `F` monad.
+         */
+        fun <F> runEnv(): FetchRunnerEnv<F> = FetchRunnerEnv()
+
+        class FetchRunnerEnv<F>(private val dummy: Boolean = true) : Any() {
+            operator fun <A> invoke(
+                C: Concurrent<F>,
+                CS: ContextShift<F>,
+                T: Timer<F>,
+                fa: Kollect<F, A>,
+                cache: DataSourceCache = InMemoryCache.empty()
+            ): Kind<F, Tuple2<Env, A>> = C.binding {
+                val env = Ref.of<F, Env>(C, FetchEnv()).bind()
+                val cacheRef = Ref.of(C, cache).bind()
+                val result = performRun(C, CS, T, fa, cacheRef, Some(env)).bind()
+                val e = env.get().bind()
+
+                Tuple2(e, result)
+            }
+        }
+
+        /**
+         * Run a `Fetch`, the cache and the result in the `F` monad.
+         */
+        fun <F> runCache(): FetchRunnerCache<F> = FetchRunnerCache()
+
+        class FetchRunnerCache<F>(private val dummy: Boolean = true) : Any() {
+            operator fun <A> invoke(
+                C: Concurrent<F>,
+                CS: ContextShift<F>,
+                T: Timer<F>,
+                fa: Kollect<F, A>,
+                cache: DataSourceCache = InMemoryCache.empty()
+            ): Kind<F, Tuple2<DataSourceCache, A>> = C.binding {
+                val cacheRef = Ref.of(C, cache).bind()
+                val result = performRun(C, CS, T, fa, cacheRef, None).bind()
+                val c = cacheRef.get().bind()
+
+                Tuple2(c, result)
+            }
+        }
+
+        // Data fetching
+
+        private fun <F, A> performRun(
+            C: Concurrent<F>,
+            CS: ContextShift<F>,
+            T: Timer<F>,
+            fa: Kollect<F, A>,
+            cache: Ref<F, DataSourceCache>,
+            env: Option<Ref<F, Env>>
+        ): Kind<F, A> = C.binding {
+            val result = fa.run.bind()
+            val value = when (result) {
+                is KollectResult.Done -> C.just(result.x)
+                is KollectResult.Blocked -> binding {
+                    fetchRound<F, A>(C, CS, T, result.rs, cache, env).bind()
+                    performRun(C, CS, T, result.cont, cache, env).bind()
+                }
+                is KollectResult.Throw -> env.fold({
+                    C.just(FetchEnv() : Env())
+                }, {
+                    it.get()
+                }).flatMap { e: Env ->
+                    C.raiseError<A>(result.e(e).toThrowable())
+                }
+            }.bind()
+            value
+        }
+
+        private fun <F, A> fetchRound(
+            C: Concurrent<F>,
+            CS: ContextShift<F>,
+            T: Timer<F>,
+            rs: RequestMap<F>,
+            cache: Ref<F, DataSourceCache>,
+            env: Option<Ref<F, Env>>
+        ): Kind<F, Unit> {
+            val blocked = rs.m.toList().map { it.second }
+            if (blocked.isEmpty()) {
+                C.just(Unit)
+            } else {
+                C.binding {
+                    val requests = NonEmptyList.fromListUnsafe(blocked).parTra
+                }
+            }
+//            if (blocked.isEmpty) Applicative[F].unit
+//            else
+//                for {
+//                    requests <- NonEmptyList.fromListUnsafe(blocked).parTraverse(
+//                        runBlockedRequest(_, cache, env)
+//                    )
+//                    performedRequests = requests.foldLeft(List.empty[Request])(_ ++ _)
+//                    _ <- if (performedRequests.isEmpty) Applicative[F].unit
+//                    else env match {
+//                        case Some(e) => e.modify((oldE) => (oldE.evolve(Round(performedRequests)), oldE))
+//                        case None => Applicative[F].unit
+//                    }
+//                } yield ()
+        }
+
+//        private def fetchRound[F[_], A](
+//        rs: RequestMap[F],
+//        cache: Ref[F, DataSourceCache],
+//        env: Option[Ref[F, Env]]
+//        )(
+//        implicit
+//        P: Par[F],
+//        C: ConcurrentEffect[F],
+//        CS: ContextShift[F],
+//        T: Timer[F]
+//        ): F[Unit] = {
+//            val blocked = rs.m.toList.map(_._2)
+//            if (blocked.isEmpty) Applicative[F].unit
+//            else
+//                for {
+//                    requests <- NonEmptyList.fromListUnsafe(blocked).parTraverse(
+//                        runBlockedRequest(_, cache, env)
+//                    )
+//                    performedRequests = requests.foldLeft(List.empty[Request])(_ ++ _)
+//                    _ <- if (performedRequests.isEmpty) Applicative[F].unit
+//                    else env match {
+//                        case Some(e) => e.modify((oldE) => (oldE.evolve(Round(performedRequests)), oldE))
+//                        case None => Applicative[F].unit
+//                    }
+//                } yield ()
+//        }
+//
+//        private def runBlockedRequest[F[_], A](
+//        blocked: BlockedRequest[F],
+//        cache: Ref[F, DataSourceCache],
+//        env: Option[Ref[F, Env]]
+//        )(
+//        implicit
+//        P: Par[F],
+//        C: ConcurrentEffect[F],
+//        CS: ContextShift[F],
+//        T: Timer[F]
+//        ): F[List[Request]] =
+//        blocked.request match {
+//            case q @ FetchOne(id, ds) => runFetchOne[F](q, blocked.result, cache, env)
+//            case q @ Batch(ids, ds) => runBatch[F](q, blocked.result, cache, env)
+//        }
+//    }
+//
+//    private def runFetchOne[F[_]](
+//    q: FetchOne[Any, Any],
+//    putResult: FetchStatus => F[Unit],
+//    cache: Ref[F, DataSourceCache],
+//    env: Option[Ref[F, Env]]
+//    )(
+//    implicit
+//    P: Par[F],
+//    C: ConcurrentEffect[F],
+//    CS: ContextShift[F],
+//    T: Timer[F]
+//    ): F[List[Request]] =
+//    for {
+//        c <- cache.get
+//        maybeCached <- c.lookup(q.id, q.ds)
+//        result <- maybeCached match {
+//            // Cached
+//            case Some(v) => putResult(FetchDone(v)) >> Applicative[F].pure(Nil)
+//
+//            // Not cached, must fetch
+//            case None => for {
+//            startTime <- T.clock.monotonic(MILLISECONDS)
+//            o <- q.ds.fetch(q.id)
+//            endTime <- T.clock.monotonic(MILLISECONDS)
+//            result <- o match {
+//                // Fetched
+//                case Some(a) => for {
+//                newC <- c.insert(q.id, a, q.ds)
+//                _ <- cache.set(newC)
+//                result <- putResult(FetchDone[Any](a))
+//            } yield List(Request(q, startTime, endTime))
+//
+//                // Missing
+//                case None =>
+//                putResult(FetchMissing()) >> Applicative[F].pure(List(Request(q, startTime, endTime)))
+//            }
+//        } yield result
+//        }
+//    } yield result
+//
+//    private case class BatchedRequest(
+//        batches: List[Batch[Any, Any]],
+//    results: Map[Any, Any]
+//    )
+//
+//    private def runBatch[F[_]](
+//    q: Batch[Any, Any],
+//    putResult: FetchStatus => F[Unit],
+//    cache: Ref[F, DataSourceCache],
+//    env: Option[Ref[F, Env]]
+//    )(
+//    implicit
+//    P: Par[F],
+//    C: ConcurrentEffect[F],
+//    CS: ContextShift[F],
+//    T: Timer[F]
+//    ): F[List[Request]] =
+//    for {
+//        c <- cache.get
+//
+//        // Remove cached IDs
+//        idLookups <- q.ids.traverse[F, (Any, Option[Any])](
+//        (i) => c.lookup(i, q.ds).map( m => (i, m) )
+//        )
+//        cachedResults = idLookups.collect({
+//            case (i, Some(a)) => (i, a)
+//        }).toMap
+//        uncachedIds = idLookups.collect({
+//            case (i, None) => i
+//        })
+//
+//        result <- uncachedIds match {
+//            // All cached
+//            case Nil => putResult(FetchDone[Map[Any, Any]](cachedResults)) >> Applicative[F].pure(Nil)
+//
+//            // Some uncached
+//            case l@_ => for {
+//            startTime <- T.clock.monotonic(MILLISECONDS)
+//
+//            uncached = NonEmptyList.fromListUnsafe(l)
+//            request = Batch(uncached, q.ds)
+//
+//            batchedRequest <- request.ds.maxBatchSize match {
+//                // Unbatched
+//                case None =>
+//                request.ds.batch[F](uncached).map(BatchedRequest(List(request), _))
+//
+//                // Batched
+//                case Some(batchSize) =>
+//                runBatchedRequest[F](request, batchSize, request.ds.batchExecution)
+//            }
+//
+//            endTime <- T.clock.monotonic(MILLISECONDS)
+//            resultMap = combineBatchResults(batchedRequest.results, cachedResults)
+//
+//            updatedCache <- c.insertMany(batchedRequest.results, request.ds)
+//            _ <- cache.set(updatedCache)
+//
+//            result <- putResult(FetchDone[Map[Any, Any]](resultMap))
+//
+//        } yield batchedRequest.batches.map(Request(_, startTime, endTime))
+//        }
+//    } yield result
+//
+//    private def runBatchedRequest[F[_]](
+//    q: Batch[Any, Any],
+//    batchSize: Int,
+//    e: BatchExecution
+//    )(
+//    implicit
+//    P: Par[F],
+//    C: ConcurrentEffect[F],
+//    CS: ContextShift[F],
+//    T: Timer[F]
+//    ): F[BatchedRequest] = {
+//        val batches = NonEmptyList.fromListUnsafe(
+//            q.ids.toList.grouped(batchSize)
+//                .map(batchIds => NonEmptyList.fromListUnsafe(batchIds))
+//            .toList
+//        )
+//        val reqs = batches.toList.map(Batch[Any, Any](_, q.ds))
+//
+//        val results = e match {
+//            case Sequentially =>
+//            batches.traverse(q.ds.batch[F])
+//            case InParallel =>
+//            batches.parTraverse(q.ds.batch[F])
+//        }
+//
+//        results.map(_.toList.reduce(combineBatchResults)).map(BatchedRequest(reqs, _))
+//    }
+//
+//    private def combineBatchResults(r: Map[Any, Any], rs: Map[Any, Any]): Map[Any, Any] =
+//    r ++ rs
+
+
     }
 }
 
