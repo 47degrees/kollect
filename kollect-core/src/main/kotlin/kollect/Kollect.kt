@@ -74,17 +74,17 @@ private fun <I : Any, A, F> combineRequests(MF: Monad<F>, x: BlockedRequest<F>, 
     val second = y.request
     return when {
         first is KollectQuery.KollectOne<*, *> && second is KollectQuery.KollectOne<*, *> -> {
-            val first = (first as KollectQuery.KollectOne<I, A>)
-            val second = (second as KollectQuery.KollectOne<I, A>)
-            val aId = first.id
-            val ds = first.ds
-            val anotherId = second.id
+            val firstOp = (first as KollectQuery.KollectOne<I, A>)
+            val secondOp = (second as KollectQuery.KollectOne<I, A>)
+            val aId = firstOp.id
+            val ds = firstOp.ds
+            val anotherId = secondOp.id
             if (aId == anotherId) {
                 val newRequest = KollectQuery.KollectOne(aId, ds)
                 val newResult = { r: KollectStatus -> MF.run { tupled(x.result(r), y.result(r)).flatMap { MF.just(Unit) } } }
                 BlockedRequest(newRequest, newResult)
             } else {
-                val newRequest = KollectQuery.Batch(combineIdentities(first, second), ds)
+                val newRequest = KollectQuery.Batch(combineIdentities(firstOp, secondOp), ds)
                 val newResult = { r: KollectStatus ->
                     when (r) {
                         is KollectStatus.KollectDone<*> -> {
@@ -102,12 +102,12 @@ private fun <I : Any, A, F> combineRequests(MF: Monad<F>, x: BlockedRequest<F>, 
             }
         }
         first is KollectQuery.KollectOne<*, *> && second is KollectQuery.Batch<*, *> -> {
-            val first = (first as KollectQuery.KollectOne<I, A>)
-            val second = (second as KollectQuery.Batch<I, A>)
-            val oneId = first.id
-            val ds = first.ds
+            val firstOp = (first as KollectQuery.KollectOne<I, A>)
+            val secondOp = (second as KollectQuery.Batch<I, A>)
+            val oneId = firstOp.id
+            val ds = firstOp.ds
 
-            val newRequest = KollectQuery.Batch(combineIdentities(first, second), ds)
+            val newRequest = KollectQuery.Batch(combineIdentities(firstOp, secondOp), ds)
             val newResult = { r: KollectStatus ->
                 when (r) {
                     is KollectStatus.KollectDone<*> -> {
@@ -121,12 +121,12 @@ private fun <I : Any, A, F> combineRequests(MF: Monad<F>, x: BlockedRequest<F>, 
             BlockedRequest(newRequest, newResult)
         }
         first is KollectQuery.Batch<*, *> && second is KollectQuery.KollectOne<*, *> -> {
-            val first = (first as KollectQuery.Batch<I, A>)
-            val second = (second as KollectQuery.KollectOne<I, A>)
-            val oneId = second.id
-            val ds = first.ds
+            val firstOp = (first as KollectQuery.Batch<I, A>)
+            val secondOp = (second as KollectQuery.KollectOne<I, A>)
+            val oneId = secondOp.id
+            val ds = firstOp.ds
 
-            val newRequest = KollectQuery.Batch(combineIdentities(first, second), ds)
+            val newRequest = KollectQuery.Batch(combineIdentities(firstOp, secondOp), ds)
             val newResult = { r: KollectStatus ->
                 when (r) {
                     is KollectStatus.KollectDone<*> -> {
@@ -141,11 +141,11 @@ private fun <I : Any, A, F> combineRequests(MF: Monad<F>, x: BlockedRequest<F>, 
         }
         // first is KollectQuery.Batch<*, *> && second is KollectQuery.Batch<*, *>
         else -> {
-            val first = (first as KollectQuery.Batch<I, A>)
-            val second = (second as KollectQuery.Batch<I, A>)
-            val ds = first.ds
+            val firstOp = (first as KollectQuery.Batch<I, A>)
+            val secondOp = (second as KollectQuery.Batch<I, A>)
+            val ds = firstOp.ds
 
-            val newRequest = KollectQuery.Batch(combineIdentities(first, second), ds)
+            val newRequest = KollectQuery.Batch(combineIdentities(firstOp, secondOp), ds)
             val newResult = { r: KollectStatus -> MF.run { tupled(x.result(r), y.result(r)).flatMap { MF.just(Unit) } } }
             BlockedRequest(newRequest, newResult)
         }
