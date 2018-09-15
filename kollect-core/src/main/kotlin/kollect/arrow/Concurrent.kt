@@ -1,16 +1,13 @@
 package arrow.effects
 
 import arrow.Kind
-import arrow.concurrent.Promise
 import arrow.core.Either
 import arrow.core.None
 import arrow.core.Option
-import arrow.core.Right
 import arrow.core.Some
-import arrow.core.Success
 import arrow.core.Tuple2
+import arrow.effects.deferred.Deferred
 import arrow.effects.typeclasses.Async
-import kollect.arrow.TrampolineEC.Companion.immediate
 import kollect.arrow.concurrent.FiniteDuration
 import kollect.arrow.concurrent.Ref
 import kollect.arrow.effects.Timer
@@ -235,50 +232,51 @@ interface Concurrent<F> : Async<F> {
          * [[Async.asyncF]] and [[Bracket.bracketCase]].
          */
         private fun <F, A> defaultCancelable(AF: Async<F>, k: ((Either<Throwable, A>) -> Unit) -> CancelToken<F>): Kind<F, A> =
-            AF.async { cb ->
-
-                val latch = Promise<Unit>()
-                val latchF = AF.async<Unit> { cb -> latch.future().onComplete(immediate) { cb(Right(Unit)) } }
-                // Side-effecting call; unfreezes latch in order to allow bracket to finish
-
-                val token = k { result ->
-                    latch.complete(Success(Unit))
-                    cb(result)
-                }
-                AF.bracketCase(AF.just(token))(_ => latchF) {
-                case (cancel, Canceled) => cancel
-                case _ => F.unit
-            }
-        }
-        }
+            TODO()
+//            AF.async { cb ->
+//
+//                val latch = Promise<Unit>()
+//                val latchF = AF.async<Unit> { cb -> latch.future().onComplete(immediate) { cb(Right(Unit)) } }
+//                // Side-effecting call; unfreezes latch in order to allow bracket to finish
+//
+//                val token = k { result ->
+//                    latch.complete(Success(Unit))
+//                    cb(result)
+//                }
+//                AF.bracketCase(AF.just(token))(_ => latchF) {
+//                case(cancel, Canceled) => cancel
+//                case _ => F . unit
+//            }
+//            }
+    }
 
     // def async[A](k: (Either[Throwable, A] => Unit) => Unit): F[A]
     // def asyncF[A](k: (Either[Throwable, A] => Unit) => F[Unit]): F[A]
-    }
-        /**
-         * [[Concurrent]] instance built for `cats.data.OptionT` values initialized
-         * with any `F` data type that also implements `Concurrent`.
-         *//*
+}
+/**
+ * [[Concurrent]] instance built for `cats.data.OptionT` values initialized
+ * with any `F` data type that also implements `Concurrent`.
+ *//*
 
         implicit def catsOptionTConcurrent[F[_]: Concurrent]: Concurrent[OptionT[F, ?]] =
         new OptionTConcurrent[F]
         { def F = Concurrent [F] }
 
         */
-        /**
-         * [[Concurrent]] instance built for `cats.data.Kleisli` values initialized
-         * with any `F` data type that also implements `Concurrent`.
-         *//*
+/**
+ * [[Concurrent]] instance built for `cats.data.Kleisli` values initialized
+ * with any `F` data type that also implements `Concurrent`.
+ *//*
 
         implicit def catsKleisliConcurrent[F[_]: Concurrent, R]: Concurrent[Kleisli[F, R, ?]] =
         new KleisliConcurrent[F, R]
         { def F = Concurrent [F] }
 
         */
-        /**
-         * [[Concurrent]] instance built for `cats.data.WriterT` values initialized
-         * with any `F` data type that also implements `Concurrent`.
-         *//*
+/**
+ * [[Concurrent]] instance built for `cats.data.WriterT` values initialized
+ * with any `F` data type that also implements `Concurrent`.
+ *//*
 
         implicit def catsWriterTConcurrent[F[_]: Concurrent, L: Monoid]: Concurrent[WriterT[F, L, ?]] =
         new WriterTConcurrent[F, L]
@@ -426,10 +424,10 @@ interface Concurrent<F> : Async<F> {
         }
 
         */
-        /**
-         * Internal API — Cancelable builder derived from
-         * [[Async.asyncF]] and [[Bracket.bracketCase]].
-         *//*
+/**
+ * Internal API — Cancelable builder derived from
+ * [[Async.asyncF]] and [[Bracket.bracketCase]].
+ *//*
 
         private def defaultCancelable[F[_], A](k: (Either[Throwable, A] => Unit) => CancelToken[F])
         (implicit F: Async[F]): F[A] =

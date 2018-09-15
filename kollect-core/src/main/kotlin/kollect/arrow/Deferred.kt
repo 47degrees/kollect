@@ -1,4 +1,4 @@
-package arrow.effects
+package arrow.effects.deferred
 
 import arrow.Kind
 import arrow.concurrent.Promise
@@ -10,8 +10,10 @@ import arrow.core.Option
 import arrow.core.Right
 import arrow.core.Success
 import arrow.core.some
-import arrow.effects.Deferred.Companion.Id
+import arrow.effects.Concurrent
+import arrow.effects.deferred.Deferred.Companion.Id
 import arrow.effects.typeclasses.Async
+import arrow.higherkind
 import kollect.arrow.ExecutionContext
 import kollect.arrow.TrampolineEC
 import java.util.concurrent.atomic.AtomicReference
@@ -37,14 +39,13 @@ import java.util.concurrent.atomic.AtomicReference
  * Finally, the blocking mentioned above is semantic only, no actual threads are
  * blocked by the implementation.
  */
-abstract class Deferred<F, A> {
+@higherkind
+abstract class Deferred<F, A> : DeferredOf<F, A> {
 
     /**
      * Obtains the value of the `Deferred`, or waits until it has been completed.
      * The returned value may be canceled.
      */
-
-
     abstract fun get(): arrow.Kind<F, A>
 
     /**
@@ -65,15 +66,13 @@ abstract class Deferred<F, A> {
      * Satisfies:
      *   `Deferred[F, A].flatMap(r => r.complete(a) *> r.get) == a.pure[F]`
      */
-
     abstract fun complete(a: A): arrow.Kind<F, Unit>
 
     companion object {
 
 
         /** Creates an unset promise. **/
-
-        inline operator fun <F, A> invoke(AF: Async<F>): arrow.Kind<F, Deferred<F, A>> = AF { unsafe<F, A>(AF) }
+        operator fun <F, A> invoke(AF: Concurrent<F>): arrow.Kind<F, Deferred<F, A>> = AF { unsafe<F, A>(AF) }
 
         /**
          * Like `apply` but returns the newly allocated promise directly
@@ -81,9 +80,8 @@ abstract class Deferred<F, A> {
          * unsafe because it is not referentially transparent -- it
          * allocates mutable state.
          */
-
-        fun <F, A> unsafe(CF: Async<F>): Deferred<F, A> =
-            ConcurrentDeferred(CF, AtomicReference(State.Unset<A>(linkedMapOf())))
+        fun <F, A> unsafe(CF: Concurrent<F>): Deferred<F, A> =
+            ConcurrentDeferred(CF, AtomicReference(State.Unset(linkedMapOf())))
 
         /**
          * Creates an unset promise that only requires an [[Async]] and
@@ -95,9 +93,8 @@ abstract class Deferred<F, A> {
          * require cancellation or in cases in which an `F[_]` data type
          * that does not support cancellation is used.
          */
-
         fun <F, A> uncancelable(MD: Async<F>): arrow.Kind<F, Deferred<F, A>> =
-            MD { unsafeUncancelable<Async<F>, F, A>() }
+            MD.defer { MD.just(unsafeUncancelable<F, A>(MD)) }
 
         /**
          * Like [[uncancelable]] but returns the newly allocated promise directly
@@ -107,9 +104,8 @@ abstract class Deferred<F, A> {
          *
          * WARN: read the caveats of [[uncancelable]].
          */
-        fun <AF : Async<F>, F, A> unsafeUncancelable(): Deferred<F, A> =
-            UncancelabbleDeferred<F, A>(Promise<A>())
-
+        fun <F, A> unsafeUncancelable(AF: Async<F>): Deferred<F, A> =
+            UncancelabbleDeferred(AF, Promise())
 
         class Id
 
@@ -133,7 +129,9 @@ class ConcurrentDeferred<F, A>(val AF: Concurrent<F>, val ref: AtomicReference<D
                     when (reference) {
                         is Companion.State.Set -> Unit
                         is Companion.State.Unset -> {
-                            val updated = Companion.State.Unset(reference.waiting - id)
+                            val waitingClone = reference.waiting.clone() as LinkedHashMap<Id, (A) -> Unit>
+                            waitingClone.remove(id)
+                            val updated = Companion.State.Unset(waitingClone)
                             if (ref.compareAndSet(reference, updated)) Unit
                             else unregister()
                         }

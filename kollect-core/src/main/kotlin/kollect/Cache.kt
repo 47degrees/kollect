@@ -1,55 +1,84 @@
 package kollect
 
+import arrow.Kind
 import arrow.core.Option
 import arrow.core.Tuple2
 import arrow.core.toOption
 import arrow.data.ListK
 import arrow.data.foldable
 import arrow.data.k
-import arrow.effects.IO
-import arrow.effects.fix
-import arrow.effects.monad
+import arrow.effects.Concurrent
+import arrow.instance
+import arrow.typeclasses.Monoid
 import kollect.arrow.foldLeftM
 
-class DataSourceName(val name: String)
-class DataSourceId(val id: Any)
+class DataSourceName(val name: String) : Any()
+class DataSourceId(val id: Any) : Any()
+class DataSourceResult(val result: Any) : Any()
 
 /**
  *  Users of Kollect can provide their own cache by implementing this interface.
  */
-interface DataSourceCache<Identity : Any, Result> {
+interface DataSourceCache {
 
-    fun lookup(i: Identity, ds: DataSource<Identity, Result>): IO<Option<Result>>
+    fun <F, Identity : Any, Result : Any> lookup(CF: Concurrent<F>, i: Identity, ds: DataSource<Identity, Result>): Kind<F, Option<Result>>
 
-    fun insert(i: Identity, v: Result, ds: DataSource<Identity, Result>): IO<DataSourceCache<Identity, Result>>
+    fun <F, Identity : Any, Result : Any> insert(CF: Concurrent<F>, i: Identity, v: Result, ds: DataSource<Identity, Result>): Kind<F, DataSourceCache>
 
-    fun insertMany(vs: Map<Identity, Result>, ds: DataSource<Identity, Result>): IO<DataSourceCache<Identity, Result>> =
-        ListK.foldable().foldLeftM(IO.monad(), vs.toList().k(), this) { c, pair: Pair<Identity, Result> ->
-            c.insert(pair.first, pair.second, ds)
-        }.fix()
+    fun <F, Identity : Any, Result : Any> insertMany(
+        CF: Concurrent<F>,
+        vs: Map<Identity, Result>,
+        ds: DataSource<Identity, Result>
+    ): Kind<F, DataSourceCache> =
+        ListK.foldable().foldLeftM(CF, vs.toList().k(), this) { c, pair: Pair<Identity, Result> ->
+            c.insert(CF, pair.first, pair.second, ds)
+        }
 }
 
 /**
  * A cache that stores its elements in memory.
  */
-data class InMemoryCache<Identity : Any, Result>(
-    val state: Map<Tuple2<DataSourceName, DataSourceId>, Result>
-) : DataSourceCache<Identity, Result> {
+data class InMemoryCache(
+    val state: Map<Tuple2<DataSourceName, DataSourceId>, DataSourceResult>
+) : DataSourceCache {
 
-    override fun lookup(i: Identity, ds: DataSource<Identity, Result>): IO<Option<Result>> =
-        IO.just(state[Tuple2(DataSourceName(ds.name()), DataSourceId(i))]).map { it.toOption() }
+    override fun <F, Identity : Any, Result : Any> lookup(
+        CF: Concurrent<F>,
+        i: Identity,
+        ds: DataSource<Identity, Result>
+    ): Kind<F, Option<Result>> = CF.run {
+        just(state[Tuple2(DataSourceName(ds.name()), DataSourceId(i))].toOption().map { it.result as Result })
+    }
 
-    override fun insert(i: Identity, v: Result, ds: DataSource<Identity, Result>): IO<DataSourceCache<Identity, Result>> =
-        IO.just(copy(state = state.filterNot { it.key == Tuple2(DataSourceName(ds.name()), DataSourceId(i)) } +
-            mapOf(Tuple2(DataSourceName(ds.name()), DataSourceId(i)) to v)))
+    override fun <F, Identity : Any, Result : Any> insert(
+        CF: Concurrent<F>,
+        i: Identity,
+        v: Result,
+        ds: DataSource<Identity, Result>
+    ): Kind<F, DataSourceCache> =
+        CF.just(copy(state = state.updated(Tuple2(DataSourceName(ds.name()), DataSourceId(i)), DataSourceResult(v))))
+
 
     companion object {
-        fun <Identity : Any, Result> empty(): InMemoryCache<Identity, Result> = InMemoryCache(emptyMap())
 
-        operator fun <Identity : Any, Result> invoke(
-            vararg results: Tuple2<Tuple2<DataSourceName, DataSourceId>, Result>
-        ): InMemoryCache<Identity, Result> = InMemoryCache(results.fold(emptyMap()) { map, tuple2 ->
-            map.plus(Pair(tuple2.a, tuple2.b))
+        fun empty(): InMemoryCache = InMemoryCache(emptyMap())
+
+        operator fun <Identity : Any, Result : Any> invoke(
+            vararg results: Tuple2<Tuple2<String, Identity>, Result>
+        ): InMemoryCache = InMemoryCache(results.fold(emptyMap()) { acc, tuple2 ->
+            val s = tuple2.a.a
+            val i = tuple2.a.b
+            val v = tuple2.b
+            acc.updated(Tuple2(DataSourceName(s), DataSourceId(i)), DataSourceResult(v))
         })
     }
 }
+
+@instance(InMemoryCache::class)
+interface inMemoryCacheMonoid : Monoid<InMemoryCache> {
+    override fun empty(): InMemoryCache = InMemoryCache.empty()
+
+    override fun InMemoryCache.combine(b: InMemoryCache): InMemoryCache = InMemoryCache(state + b.state)
+}
+
+fun <K, V> Map<K, V>.updated(k: K, newVal: V) = this.filterNot { it.key == k } + mapOf(k to newVal)

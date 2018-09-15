@@ -7,9 +7,8 @@ import arrow.core.getOrElse
 import arrow.core.toOption
 import arrow.data.NonEmptyList
 import arrow.data.foldLeft
-import arrow.effects.Deferred
-import arrow.effects.DeferredK
-import arrow.effects.typeclasses.Async
+import arrow.effects.Concurrent
+import arrow.effects.deferred.Deferred
 import arrow.higherkind
 import arrow.instance
 import arrow.typeclasses.Applicative
@@ -183,16 +182,16 @@ sealed class Kollect<F, A> : KollectOf<F, A> {
         fun <F, A> error(AF: Applicative<F>, e: Throwable): Kollect<F, A> = exception(AF) { env -> KollectException.UnhandledException(e, env) }
 
         @Suppress("UNCHECKED_CAST")
-        operator fun <F, I : Any, A> invoke(AF: Async<F>, id: I, ds: DataSource<I, A>): Kollect<F, A> =
+        operator fun <F, I : Any, A> invoke(AF: Concurrent<F>, id: I, ds: DataSource<I, A>): Kollect<F, A> =
             Unkollect(AF.binding {
-                val deferred = Deferred<F, KollectStatus>(AF)
+                val deferred = Deferred<F, KollectStatus>(AF) as Deferred<F, KollectStatus>
                 val request = KollectQuery.KollectOne(id, ds)
                 val result = { a: KollectStatus -> deferred.complete(a) }
                 val blocked = BlockedRequest(request, result)
                 val anyDs = ds as DataSource<Any, Any>
-                val blockedRequest = RequestMap<F>(mapOf(anyDs to blocked))
+                val blockedRequest = RequestMap(mapOf(anyDs to blocked))
 
-                KollectResult.Blocked(blockedRequest, Unkollect<F, A>(
+                KollectResult.Blocked(blockedRequest, Unkollect(
                     deferred.get().flatMap {
                         when (it) {
                             is KollectStatus.KollectDone<*> -> AF.just(KollectResult.Done<F, A>(it.result as A))
@@ -203,6 +202,30 @@ sealed class Kollect<F, A> : KollectOf<F, A> {
                     }
                 ))
             })
+
+        /**
+         * Run a `Kollect`, the result in the `F` monad.
+         */
+        fun <F> run(): KollectRunner<F> = KollectRunner<F>
+
+        private class KollectRunner<F>(private val dummy: Boolean = true) : Any() {
+            operator fun <A> invoke(fa: Kollect<F, A>, cache: DataSourceCache<> = InMemoryCache.empty()) {
+
+            }
+            def apply[A](
+                ,
+
+            )(
+                implicit
+                    P: Par[F],
+            C: ConcurrentEffect[F],
+            CS: ContextShift[F],
+            T: Timer[F]
+            ): F[A] = for {
+                cache <- Ref.of[F, DataSourceCache](cache)
+                result <- performRun(fa, cache, None)
+            } yield result
+        }
     }
 }
 
