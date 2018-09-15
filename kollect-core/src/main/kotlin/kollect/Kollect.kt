@@ -231,9 +231,9 @@ sealed class Kollect<F, A> : KollectOf<F, A> {
         /**
          * Run a `Fetch`, the environment and the result in the `F` monad.
          */
-        fun <F> runEnv(): FetchRunnerEnv<F> = FetchRunnerEnv()
+        fun <F> runEnv(): KollectRunnerEnv<F> = KollectRunnerEnv()
 
-        class FetchRunnerEnv<F>(private val dummy: Boolean = true) : Any() {
+        class KollectRunnerEnv<F>(private val dummy: Boolean = true) : Any() {
             operator fun <A> invoke(
                 C: Concurrent<F>,
                 CS: ContextShift<F>,
@@ -253,9 +253,9 @@ sealed class Kollect<F, A> : KollectOf<F, A> {
         /**
          * Run a `Fetch`, the cache and the result in the `F` monad.
          */
-        fun <F> runCache(): FetchRunnerCache<F> = FetchRunnerCache()
+        fun <F> runCache(): KollectRunnerCache<F> = KollectRunnerCache()
 
-        class FetchRunnerCache<F>(private val dummy: Boolean = true) : Any() {
+        class KollectRunnerCache<F>(private val dummy: Boolean = true) : Any() {
             operator fun <A> invoke(
                 C: Concurrent<F>,
                 CS: ContextShift<F>,
