@@ -57,7 +57,7 @@ interface DataSource<Identity : Any, Result> {
      * @return IO<Map<Identity, Result>> representing an IO operation that will eventually return a map of relations
      * from Id to Result for all the fetched items.
      */
-    fun <F> batch(CF: Concurrent<F>, P: Par<F>, ids: NonEmptyList<Identity>): Kind<F, Map<Identity, Result>> = when (ids.size) {
+    fun <F, G> batch(CF: Concurrent<F>, P: Par<F, G>, ids: NonEmptyList<Identity>): Kind<F, Map<Identity, Result>> = when (ids.size) {
         0 -> CF.just(mapOf())
         1 -> CF.async { fetchOneById(ids[0]) }
         2 -> P.parallelMapN(CommonPool, fetchOneById(ids[0]), fetchOneById(ids[1])) { a, b -> a.toMap() + b.toMap() }
