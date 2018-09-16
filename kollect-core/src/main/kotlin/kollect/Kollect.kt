@@ -20,10 +20,11 @@ import arrow.typeclasses.Monad
 import arrow.typeclasses.Traverse
 import arrow.typeclasses.binding
 import kollect.arrow.ContextShift
-import kollect.arrow.Parallel
+import kollect.arrow.Par
+import kollect.arrow.Parallel.Companion.parTraverse
 import kollect.arrow.concurrent.Ref
 import kollect.arrow.effects.Timer
-import kollect.arrow.parTraverse
+import java.util.concurrent.TimeUnit
 
 // Kollect queries
 interface KollectRequest
@@ -219,9 +220,9 @@ sealed class Kollect<F, A> : KollectOf<F, A> {
         fun <F> run(): KollectRunner<F> = KollectRunner()
 
         class KollectRunner<F>(private val dummy: Boolean = true) : Any() {
-            operator fun <T, M, A> invoke(
-                TT: Traverse<T>,
-                P: Parallel<M, F>,
+            operator fun <M, A> invoke(
+                TT: Traverse<ForNonEmptyList>,
+                P: Par<F, M>,
                 C: Concurrent<F>,
                 CS: ContextShift<F>,
                 TF: Timer<F>,
@@ -240,9 +241,9 @@ sealed class Kollect<F, A> : KollectOf<F, A> {
         fun <F> runEnv(): KollectRunnerEnv<F> = KollectRunnerEnv()
 
         class KollectRunnerEnv<F>(private val dummy: Boolean = true) : Any() {
-            operator fun <T, M, A> invoke(
-                TT: Traverse<T>,
-                P: Parallel<M, F>,
+            operator fun <M, A> invoke(
+                TT: Traverse<ForNonEmptyList>,
+                P: Par<F, M>,
                 C: Concurrent<F>,
                 CS: ContextShift<F>,
                 TF: Timer<F>,
@@ -264,9 +265,9 @@ sealed class Kollect<F, A> : KollectOf<F, A> {
         fun <F> runCache(): KollectRunnerCache<F> = KollectRunnerCache()
 
         class KollectRunnerCache<F>(private val dummy: Boolean = true) : Any() {
-            operator fun <T, M, A> invoke(
-                TT: Traverse<T>,
-                P: Parallel<M, F>,
+            operator fun <M, A> invoke(
+                TT: Traverse<ForNonEmptyList>,
+                P: Par<F, M>,
                 C: Concurrent<F>,
                 CS: ContextShift<F>,
                 TF: Timer<F>,
@@ -283,9 +284,9 @@ sealed class Kollect<F, A> : KollectOf<F, A> {
 
         // Data fetching
 
-        private fun <T, M, F, A> performRun(
-            TT: Traverse<T>,
-            P: Parallel<M, F>,
+        private fun <M, F, A> performRun(
+            TT: Traverse<ForNonEmptyList>,
+            P: Par<F, M>,
             C: Concurrent<F>,
             CS: ContextShift<F>,
             TF: Timer<F>,
@@ -311,9 +312,9 @@ sealed class Kollect<F, A> : KollectOf<F, A> {
             value
         }
 
-        private fun <T, M, F> fetchRound(
-            TT: Traverse<T>,
-            P: Parallel<M, F>,
+        private fun <M, F> fetchRound(
+            TT: Traverse<ForNonEmptyList>,
+            P: Par<F, M>,
             C: Concurrent<F>,
             CS: ContextShift<F>,
             TF: Timer<F>,
@@ -322,115 +323,82 @@ sealed class Kollect<F, A> : KollectOf<F, A> {
             env: Option<Ref<F, Env>>
         ): Kind<F, Unit> {
             val blockedRequests = rs.m.toList().map { it.second }
-            if (blockedRequests.isEmpty()) {
+            return if (blockedRequests.isEmpty()) {
                 C.just(Unit)
             } else {
                 C.binding {
-                    val requests = parTraverse<T, M, F, BlockedRequest<F>, NonEmptyList<BlockedRequest<F>>>(TT, P, NonEmptyList.fromListUnsafe(blockedRequests)) {
-                        runBlockedRequest(TT, P, C, CS, TF, it, cache, env)
+                    val requests =
+                        parTraverse(P.parallel(), TT, NonEmptyList.fromListUnsafe(blockedRequests)) {
+                            runBlockedRequest(TT, P, C, CS, TF, it, cache, env)
+                        }.bind()
+
+                    val performedRequests = (requests as NonEmptyList<List<Request>>)
+                        .foldLeft(listOf<Request>()) { acc, list -> acc + list }
+                    if (performedRequests.isEmpty()) {
+                        C.just(Unit)
+                    } else {
+                        when (env) {
+                            is Some -> env.t.modify { oldE -> Tuple2(oldE.evolve(Round(performedRequests)), oldE) }
+                            is None -> C.just(Unit)
+                        }
                     }.bind()
-                    val performedRequests = requests.fold
+                    Unit
                 }
             }
-//            if (blocked.isEmpty) Applicative[F].unit
-//            else
-//                for {
-//                    requests <- NonEmptyList.fromListUnsafe(blocked).parTraverse(
-//                        runBlockedRequest(_, cache, env)
-//                    )
-//                    performedRequests = requests.foldLeft(List.empty[Request])(_ ++ _)
-//                    _ <- if (performedRequests.isEmpty) Applicative[F].unit
-//                    else env match {
-//                        case Some(e) => e.modify((oldE) => (oldE.evolve(Round(performedRequests)), oldE))
-//                        case None => Applicative[F].unit
-//                    }
-//                } yield ()
         }
 
-        //        private def fetchRound[F[_], A](
-//        rs: RequestMap[F],
-//        cache: Ref[F, DataSourceCache],
-//        env: Option[Ref[F, Env]]
-//        )(
-//        implicit
-//        P: Par[F],
-//        C: ConcurrentEffect[F],
-//        CS: ContextShift[F],
-//        T: Timer[F]
-//        ): F[Unit] = {
-//            val blocked = rs.m.toList.map(_._2)
-//            if (blocked.isEmpty) Applicative[F].unit
-//            else
-//                for {
-//                    requests <- NonEmptyList.fromListUnsafe(blocked).parTraverse(
-//                        runBlockedRequest(_, cache, env)
-//                    )
-//                    performedRequests = requests.foldLeft(List.empty[Request])(_ ++ _)
-//                    _ <- if (performedRequests.isEmpty) Applicative[F].unit
-//                    else env match {
-//                        case Some(e) => e.modify((oldE) => (oldE.evolve(Round(performedRequests)), oldE))
-//                        case None => Applicative[F].unit
-//                    }
-//                } yield ()
-//        }
-//
-        private fun <T, M, F, A> runBlockedRequest(
+        private fun <T, M, F> runBlockedRequest(
             TT: Traverse<T>,
-            P: Parallel<M, F>,
+            P: Par<F, M>,
             C: Concurrent<F>,
             CS: ContextShift<F>,
             TF: Timer<F>,
             blocked: BlockedRequest<F>,
             cache: Ref<F, DataSourceCache>,
             env: Option<Ref<F, Env>>
-        ): Kind<F, List<Request>> = blocked.request.let { request ->
-            when (request) {
-                is KollectQuery.KollectOne -> runFetchOne<F>(request, blocked.result, cache, env)
-                is KollectQuery.Batch -> runBatch[F](request, blocked.result, cache, env)
+        ): Kind<F, List<Request>> =
+            blocked.request.let { request ->
+                when (request) {
+                    is KollectQuery.KollectOne -> runKollectOne<F, M>(P, C, CS, TF, request, blocked.result, cache, env)
+                    is KollectQuery.Batch -> runBatch[F](request, blocked.result, cache, env)
+                }
             }
+
+        private fun <F, M> runKollectOne(
+            P: Par<F, M>,
+            C: Concurrent<F>,
+            CS: ContextShift<F>,
+            TF: Timer<F>,
+            q: KollectQuery.KollectOne<Any, Any>,
+            putResult: (KollectStatus) -> Kind<F, Unit>,
+            cache: Ref<F, DataSourceCache>,
+            env: Option<Ref<F, Env>>
+        ): Kind<F, List<Request>> = C.binding {
+            val c = cache.get().bind()
+            val maybeCached = c.lookup(C, q.id, q.ds).bind()
+            val result = when (maybeCached) {
+                // Cached
+                is Some -> putResult(KollectStatus.KollectDone(maybeCached.t)).flatMap { C.just(listOf<Request>()) }
+                is None -> binding {
+                    val startTime = TF.clock().monotonic(TimeUnit.MILLISECONDS).bind()
+                    val o = q.ds.fetch(C, q.id).bind()
+                    val endTime = TF.clock().monotonic(TimeUnit.MILLISECONDS).bind()
+                    val res = when (o) {
+                        // Fetched
+                        is Some -> binding {
+                            val newC = c.insert(C, q.id, o.t, q.ds).bind()
+                            cache.set(newC).bind()
+                            putResult(KollectStatus.KollectDone(o.t)).bind()
+                            listOf(Request(q, startTime, endTime))
+                        }
+                        is None -> putResult(KollectStatus.KollectMissing).flatMap { C.just(listOf(Request(q, startTime, endTime))) }
+                    }.bind()
+                    res
+                }
+            }.bind()
+            result
         }
-//    }
-//
-//    private def runFetchOne[F[_]](
-//    q: FetchOne[Any, Any],
-//    putResult: FetchStatus => F[Unit],
-//    cache: Ref[F, DataSourceCache],
-//    env: Option[Ref[F, Env]]
-//    )(
-//    implicit
-//    P: Par[F],
-//    C: ConcurrentEffect[F],
-//    CS: ContextShift[F],
-//    T: Timer[F]
-//    ): F[List[Request]] =
-//    for {
-//        c <- cache.get
-//        maybeCached <- c.lookup(q.id, q.ds)
-//        result <- maybeCached match {
-//            // Cached
-//            case Some(v) => putResult(FetchDone(v)) >> Applicative[F].pure(Nil)
-//
-//            // Not cached, must fetch
-//            case None => for {
-//            startTime <- T.clock.monotonic(MILLISECONDS)
-//            o <- q.ds.fetch(q.id)
-//            endTime <- T.clock.monotonic(MILLISECONDS)
-//            result <- o match {
-//                // Fetched
-//                case Some(a) => for {
-//                newC <- c.insert(q.id, a, q.ds)
-//                _ <- cache.set(newC)
-//                result <- putResult(FetchDone[Any](a))
-//            } yield List(Request(q, startTime, endTime))
-//
-//                // Missing
-//                case None =>
-//                putResult(FetchMissing()) >> Applicative[F].pure(List(Request(q, startTime, endTime)))
-//            }
-//        } yield result
-//        }
-//    } yield result
-//
+
 //    private case class BatchedRequest(
 //        batches: List[Batch[Any, Any]],
 //    results: Map[Any, Any]
