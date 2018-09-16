@@ -24,7 +24,8 @@ data class Round(val queries: List<Request>)
 /**
  * A concrete implementation of `Env` used in the default Fetch interpreter.
  */
-data class KollectEnv(override val rounds: List<Round>) : Env {
+data class KollectEnv(override val rounds: List<Round> = listOf()) : Env {
 
     override fun evolve(newRound: Round): KollectEnv = copy(rounds = rounds + newRound)
 }
+

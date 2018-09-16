@@ -16,6 +16,7 @@ import arrow.data.WriterT
 import arrow.data.WriterTPartialOf
 import arrow.data.fix
 import arrow.data.value
+import arrow.instance
 import arrow.typeclasses.Applicative
 import arrow.typeclasses.Functor
 import arrow.typeclasses.Monad
@@ -46,78 +47,77 @@ interface ContextShift<F> {
      * @param fa  Computation to evaluate using `ec`
      */
     fun <A> evalOn(ec: ExecutionContext, fa: arrow.Kind<F, A>): arrow.Kind<F, A>
+}
 
-    companion object {
+@instance(ContextShift::class)
+interface EitherTContextShift<F, L> : ContextShift<EitherTPartialOf<F, L>> {
 
-        /**
-         * Derives a [[ContextShift]] instance for `cats.data.EitherT`,
-         * given we have one for `F[_]`.
-         */
+    fun FF(): Functor<F>
 
-        fun <F, L> deriveEitherT(FF: Functor<F>, cs: ContextShift<F>): ContextShift<EitherTPartialOf<F, L>> =
-            object : ContextShift<EitherTPartialOf<F, L>> {
-                override fun shift(): Kind<EitherTPartialOf<F, L>, Unit> = FF.run {
-                    EitherT(cs.shift().map { Right(it) })
-                }
+    fun CS(): ContextShift<F>
 
-                override fun <A> evalOn(ec: ExecutionContext, fa: Kind<EitherTPartialOf<F, L>, A>): Kind<EitherTPartialOf<F, L>, A> =
-                    EitherT(cs.evalOn(ec, fa.value()))
-            }
-
-        /**
-         * Derives a [[ContextShift]] instance for `cats.data.OptionT`,
-         * given we have one for `F[_]`.
-         */
-        fun <F> deriveOptionT(FF: Functor<F>, cs: ContextShift<F>): ContextShift<OptionTPartialOf<F>> =
-            object : ContextShift<OptionTPartialOf<F>> {
-
-                override fun shift(): Kind<OptionTPartialOf<F>, Unit> = FF.run {
-                    OptionT(cs.shift().map { Some(it) })
-                }
-
-                override fun <A> evalOn(ec: ExecutionContext, fa: Kind<OptionTPartialOf<F>, A>): Kind<OptionTPartialOf<F>, A> =
-                    OptionT(cs.evalOn(ec, fa.value()))
-            }
-
-        /**
-         * Derives a [[ContextShift]] instance for `cats.data.WriterT`,
-         * given we have one for `F[_]`.
-         */
-        fun <F, L> deriveWriterT(AF: Applicative<F>, ML: Monoid<L>, cs: ContextShift<F>): ContextShift<WriterTPartialOf<F, L>> = AF.run {
-            object : ContextShift<WriterTPartialOf<F, L>> {
-                override fun shift(): Kind<WriterTPartialOf<F, L>, Unit> =
-                    WriterT(cs.shift().map { v -> Tuple2(ML.empty(), v) })
-
-                override fun <A> evalOn(ec: ExecutionContext, fa: Kind<WriterTPartialOf<F, L>, A>): Kind<WriterTPartialOf<F, L>, A> =
-                    WriterT(cs.evalOn(ec, fa.value()))
-            }
-        }
-
-        /**
-         * Derives a [[ContextShift]] instance for `cats.data.StateT`,
-         * given we have one for `F[_]`.
-         */
-        fun <F, L> deriveStateT(MF: Monad<F>, cs: ContextShift<F>): ContextShift<StateTPartialOf<F, L>> = MF.run {
-            object : ContextShift<StateTPartialOf<F, L>> {
-                override fun shift(): Kind<StateTPartialOf<F, L>, Unit> =
-                    StateT(just { s -> cs.shift().map { a -> Tuple2(s, a) } })
-
-                override fun <A> evalOn(ec: ExecutionContext, fa: Kind<StateTPartialOf<F, L>, A>): Kind<StateTPartialOf<F, L>, A> =
-                    StateT.invoke(MF) { s -> cs.evalOn(ec, fa.fix().run(MF, s)) }
-            }
-        }
-
-        /**
-         * Derives a [[ContextShift]] instance for `cats.data.Kleisli`,
-         * given we have one for `F[_]`.
-         */
-        fun <F, R> deriveKleisli(cs: ContextShift<F>): ContextShift<KleisliPartialOf<F, R>> =
-            object : ContextShift<KleisliPartialOf<F, R>> {
-                override fun shift(): Kind<KleisliPartialOf<F, R>, Unit> =
-                    Kleisli.invoke { cs.shift() }
-
-                override fun <A> evalOn(ec: ExecutionContext, fa: Kind<KleisliPartialOf<F, R>, A>): Kind<KleisliPartialOf<F, R>, A> =
-                    Kleisli.invoke { a -> cs.evalOn(ec, fa.fix().run(a)) }
-            }
+    override fun shift(): Kind<EitherTPartialOf<F, L>, Unit> = FF().run {
+        EitherT(CS().shift().map { Right(it) })
     }
+
+    override fun <A> evalOn(ec: ExecutionContext, fa: Kind<EitherTPartialOf<F, L>, A>): Kind<EitherTPartialOf<F, L>, A> =
+        EitherT(CS().evalOn(ec, fa.value()))
+}
+
+@instance(ContextShift::class)
+interface OptionTContextShift<F> : ContextShift<OptionTPartialOf<F>> {
+
+    fun FF(): Functor<F>
+
+    fun CS(): ContextShift<F>
+
+    override fun shift(): Kind<OptionTPartialOf<F>, Unit> = FF().run {
+        OptionT(CS().shift().map { Some(it) })
+    }
+
+    override fun <A> evalOn(ec: ExecutionContext, fa: Kind<OptionTPartialOf<F>, A>): Kind<OptionTPartialOf<F>, A> =
+        OptionT(CS().evalOn(ec, fa.value()))
+}
+
+@instance(ContextShift::class)
+interface WriterTContextShift<F, L> : ContextShift<WriterTPartialOf<F, L>> {
+    fun AF(): Applicative<F>
+
+    fun ML(): Monoid<L>
+
+    fun CS(): ContextShift<F>
+
+    override fun shift(): Kind<WriterTPartialOf<F, L>, Unit> = AF().run {
+        WriterT(CS().shift().map { v -> Tuple2(ML().empty(), v) })
+    }
+
+    override fun <A> evalOn(ec: ExecutionContext, fa: Kind<WriterTPartialOf<F, L>, A>): Kind<WriterTPartialOf<F, L>, A> =
+        WriterT(CS().evalOn(ec, fa.value()))
+}
+
+@instance(ContextShift::class)
+interface StateTContextShift<F, L> : ContextShift<StateTPartialOf<F, L>> {
+
+    fun MF(): Monad<F>
+
+    fun CS(): ContextShift<F>
+
+    override fun shift(): Kind<StateTPartialOf<F, L>, Unit> = MF().run {
+        StateT(just { s -> CS().shift().map { a -> Tuple2(s, a) } })
+    }
+
+    override fun <A> evalOn(ec: ExecutionContext, fa: Kind<StateTPartialOf<F, L>, A>): Kind<StateTPartialOf<F, L>, A> =
+        StateT.invoke(MF()) { s -> CS().evalOn(ec, fa.fix().run(MF(), s)) }
+}
+
+@instance(ContextShift::class)
+interface KleisliContextShift<F, R> : ContextShift<KleisliPartialOf<F, R>> {
+
+    fun CS(): ContextShift<F>
+
+    override fun shift(): Kind<KleisliPartialOf<F, R>, Unit> =
+        Kleisli.invoke { CS().shift() }
+
+    override fun <A> evalOn(ec: ExecutionContext, fa: Kind<KleisliPartialOf<F, R>, A>): Kind<KleisliPartialOf<F, R>, A> =
+        Kleisli.invoke { a -> CS().evalOn(ec, fa.fix().run(a)) }
 }
