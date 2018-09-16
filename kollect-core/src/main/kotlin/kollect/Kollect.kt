@@ -185,7 +185,7 @@ sealed class Kollect<F, A> : KollectOf<F, A> {
         /**
          * Lift a plain value to the Kollect monad.
          */
-        fun <F, A> pure(AF: Applicative<F>, a: A): Kollect<F, A> = Unkollect(AF.just(KollectResult.Done(a)))
+        fun <F, A> just(AF: Applicative<F>, a: A): Kollect<F, A> = Unkollect(AF.just(KollectResult.Done(a)))
 
         fun <F, A> exception(AF: Applicative<F>, e: (Env) -> KollectException): Kollect<F, A> = Unkollect(AF.just(KollectResult.Throw(e)))
 
