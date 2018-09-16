@@ -1,7 +1,10 @@
 package kollect.arrow
 
+import arrow.Kind
 import arrow.core.PartialFunction
+import arrow.data.ForNonEmptyList
 import arrow.data.NonEmptyList
+import arrow.data.fix
 import arrow.data.nel
 
 /**
@@ -20,8 +23,8 @@ import arrow.data.nel
  * res1: scala.collection.immutable.List[String] = List(odd, even, odd, even, odd)
  * }}}
  */
-fun <A, B> NonEmptyList<A>.collect(pf: PartialFunction<A, B>): List<B> = if (pf.isDefinedAt(head)) {
-    NonEmptyList(pf.invoke(head), tail.nel().collect<A, B>(pf))
+fun <A, B> Kind<ForNonEmptyList, A>.collect(pf: PartialFunction<A, B>): List<B> = if (pf.isDefinedAt(fix().head)) {
+    NonEmptyList(pf.invoke(fix().head), fix().tail.nel().collect<A, B>(pf))
 } else {
-    NonEmptyList.fromListUnsafe(tail.nel().collect<A, B>(pf))
+    NonEmptyList.fromListUnsafe(fix().tail.nel().collect<A, B>(pf))
 }.all

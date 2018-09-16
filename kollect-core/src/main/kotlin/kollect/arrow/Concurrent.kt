@@ -8,6 +8,7 @@ import arrow.core.Some
 import arrow.core.Tuple2
 import arrow.effects.deferred.Deferred
 import arrow.effects.typeclasses.Async
+import arrow.effects.typeclasses.Effect
 import kollect.arrow.concurrent.FiniteDuration
 import kollect.arrow.concurrent.Ref
 import kollect.arrow.effects.Timer
@@ -16,7 +17,7 @@ import java.util.concurrent.TimeoutException
 /**
  * Type class for [[Async]] data types that are cancelable and can be started concurrently.
  */
-interface Concurrent<F> : Async<F> {
+interface Concurrent<F> : Effect<F> {
 
     /**
      * Start concurrent execution of the source suspended in

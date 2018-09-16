@@ -437,7 +437,7 @@ sealed class Kollect<F, A> : KollectOf<F, A> {
                     val batchedRequest = request.ds.maxBatchSize().let { maxBatchSize ->
                         when (maxBatchSize) {
                             // Unbatched
-                            is None -> request.ds.batch(C, P, uncached).map {
+                            is None -> request.ds.batch(TT, C, P, uncached).map {
                                 BatchedRequest(listOf(request), it)
                             }
                             // Batched
@@ -473,8 +473,8 @@ sealed class Kollect<F, A> : KollectOf<F, A> {
             val requests = batches.all.map { KollectQuery.Batch(it, q.ds) }
 
             val results = when (e) {
-                is Sequentially -> batches.traverse(C) { q.ds.batch(C, P, it) }
-                is InParallel -> parTraverse(P.parallel(), TT, batches) { q.ds.batch(C, P, it) }
+                is Sequentially -> batches.traverse(C) { q.ds.batch(TT, C, P, it) }
+                is InParallel -> parTraverse(P.parallel(), TT, batches) { q.ds.batch(TT, C, P, it) }
             }
 
             return C.run {
