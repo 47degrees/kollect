@@ -367,7 +367,7 @@ interface Future<out T> : Awaitable<T> {
      * @param f     the function to be executed when this `Future` completes
      * @group Callbacks
      */
-    fun <U: Any> onComplete(executor: ExecutionContext, f: (Try<T>) -> U): Unit
+    fun <U : Any> onComplete(executor: ExecutionContext, f: (Try<T>) -> U): Unit
 
     /* Miscellaneous */
 
@@ -514,8 +514,7 @@ interface Future<out T> : Awaitable<T> {
         }
     }
 
-    /** Creates a new future with one level of nesting flattened, this method is equivalent
-     *  to `flatMap(identity)`.
+    /** Creates a new future with one level of nesting flattened, this method is equivalent to `flatMap(identity)`.
      *
      * @tparam S  the type of the returned `Future`
      * @group Transformations

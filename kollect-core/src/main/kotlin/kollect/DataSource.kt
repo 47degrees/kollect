@@ -32,8 +32,8 @@ interface DataSource<I, A> {
     /**
      * Fetches a value from the source of data by its given Identity.
      *
-     * @param id for the fetched item Identity.
-     * @return IO<Option<Result>> since this operation represents an IO computation that returns an optional result. In
+     * @param id for the fetched item I.
+     * @return IO<Option<A>> since this operation represents an IO computation that returns an optional result. In
      * case the result is not found, it'll return None.
      */
     fun <F> fetch(CF: Concurrent<F>, id: I): Kind<F, Option<A>>

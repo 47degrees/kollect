@@ -500,7 +500,7 @@ sealed class Kollect<F, A> : KollectOf<F, A> {
 
 // Kollect ops
 @instance(Kollect::class)
-interface KollectMonad<F, I, Result> : Monad<KollectPartialOf<F>> {
+interface KollectMonad<F, I, A> : Monad<KollectPartialOf<F>> {
 
     fun MF(): Monad<F>
 
@@ -527,7 +527,7 @@ interface KollectMonad<F, I, Result> : Monad<KollectPartialOf<F>> {
                 first is KollectResult.Done && second is KollectResult.Done -> KollectResult.Done(Tuple2(first.x, second.x))
                 first is KollectResult.Done && second is KollectResult.Blocked -> KollectResult.Blocked(second.rs, this@product.product(second.cont))
                 first is KollectResult.Blocked && second is KollectResult.Done -> KollectResult.Blocked(first.rs, first.cont.product(fb))
-                first is KollectResult.Blocked && second is KollectResult.Blocked -> KollectResult.Blocked(combineRequestMaps<I, Result, F>(MF(), first.rs, second.rs), first.cont.product(second.cont))
+                first is KollectResult.Blocked && second is KollectResult.Blocked -> KollectResult.Blocked(combineRequestMaps<I, A, F>(MF(), first.rs, second.rs), first.cont.product(second.cont))
                 // second is KollectResult.Throw
                 else -> KollectResult.Throw((second as KollectResult.Throw).e)
             }

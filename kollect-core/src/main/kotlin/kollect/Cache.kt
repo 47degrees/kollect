@@ -21,16 +21,16 @@ class DataSourceResult(val result: Any) : Any()
  */
 interface DataSourceCache {
 
-    fun <F, Identity : Any, Result : Any> lookup(CF: Concurrent<F>, i: Identity, ds: DataSource<Identity, Result>): Kind<F, Option<Result>>
+    fun <F, I : Any, A : Any> lookup(CF: Concurrent<F>, i: I, ds: DataSource<I, A>): Kind<F, Option<A>>
 
-    fun <F, Identity : Any, Result : Any> insert(CF: Concurrent<F>, i: Identity, v: Result, ds: DataSource<Identity, Result>): Kind<F, DataSourceCache>
+    fun <F, I : Any, A : Any> insert(CF: Concurrent<F>, i: I, v: A, ds: DataSource<I, A>): Kind<F, DataSourceCache>
 
-    fun <F, Identity : Any, Result : Any> insertMany(
+    fun <F, I : Any, A : Any> insertMany(
         CF: Concurrent<F>,
-        vs: Map<Identity, Result>,
-        ds: DataSource<Identity, Result>
+        vs: Map<I, A>,
+        ds: DataSource<I, A>
     ): Kind<F, DataSourceCache> =
-        ListK.foldable().foldLeftM(CF, vs.toList().k(), this) { c, pair: Pair<Identity, Result> ->
+        ListK.foldable().foldLeftM(CF, vs.toList().k(), this) { c, pair: Pair<I, A> ->
             c.insert(CF, pair.first, pair.second, ds)
         }
 }
@@ -42,19 +42,19 @@ data class InMemoryCache(
     val state: Map<Tuple2<DataSourceName, DataSourceId>, DataSourceResult>
 ) : DataSourceCache {
 
-    override fun <F, Identity : Any, Result : Any> lookup(
+    override fun <F, I : Any, A : Any> lookup(
         CF: Concurrent<F>,
-        i: Identity,
-        ds: DataSource<Identity, Result>
-    ): Kind<F, Option<Result>> = CF.run {
-        just(state[Tuple2(DataSourceName(ds.name()), DataSourceId(i))].toOption().map { it.result as Result })
+        i: I,
+        ds: DataSource<I, A>
+    ): Kind<F, Option<A>> = CF.run {
+        just(state[Tuple2(DataSourceName(ds.name()), DataSourceId(i))].toOption().map { it.result as A })
     }
 
-    override fun <F, Identity : Any, Result : Any> insert(
+    override fun <F, I : Any, A : Any> insert(
         CF: Concurrent<F>,
-        i: Identity,
-        v: Result,
-        ds: DataSource<Identity, Result>
+        i: I,
+        v: A,
+        ds: DataSource<I, A>
     ): Kind<F, DataSourceCache> =
         CF.just(copy(state = state.updated(Tuple2(DataSourceName(ds.name()), DataSourceId(i)), DataSourceResult(v))))
 
@@ -63,8 +63,8 @@ data class InMemoryCache(
 
         fun empty(): InMemoryCache = InMemoryCache(emptyMap())
 
-        operator fun <Identity : Any, Result : Any> invoke(
-            vararg results: Tuple2<Tuple2<String, Identity>, Result>
+        operator fun <I : Any, A : Any> invoke(
+            vararg results: Tuple2<Tuple2<String, I>, A>
         ): InMemoryCache = InMemoryCache(results.fold(emptyMap()) { acc, tuple2 ->
             val s = tuple2.a.a
             val i = tuple2.a.b
