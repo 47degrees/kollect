@@ -30,46 +30,56 @@ import kollect.arrow.concurrent.Ref
 import kollect.arrow.effects.Timer
 import java.util.concurrent.TimeUnit
 
-// Kollect queries
 sealed class KollectRequest
 
-// A query to a remote data source
-sealed class KollectQuery<I : Any, A> : KollectRequest() {
+/**
+ * Reified operations to query a data source. You can kollect one, or many (batch). `I` stands for the Identity used to
+ * perform the query. `A` would be the result.
+ */
+sealed class KollectQuery<I, A> : KollectRequest() {
     abstract val dataSource: DataSource<I, A>
     abstract val identities: NonEmptyList<I>
 
-    data class KollectOne<I : Any, A>(val id: I, val ds: DataSource<I, A>) : KollectQuery<I, A>() {
+    data class KollectOne<I, A>(val id: I, val ds: DataSource<I, A>) : KollectQuery<I, A>() {
         override val identities: NonEmptyList<I> = NonEmptyList(id, emptyList())
         override val dataSource: DataSource<I, A> = ds
     }
 
-    data class Batch<I : Any, A>(val ids: NonEmptyList<I>, val ds: DataSource<I, A>) : KollectQuery<I, A>() {
+    data class Batch<I, A>(val ids: NonEmptyList<I>, val ds: DataSource<I, A>) : KollectQuery<I, A>() {
         override val identities: NonEmptyList<I> = ids
         override val dataSource: DataSource<I, A> = ds
     }
 }
 
-// Kollect result states
+/**
+ * Kollect query resulting states.
+ */
 sealed class KollectStatus {
     data class KollectDone<A>(val result: A) : KollectStatus()
     object KollectMissing : KollectStatus()
 }
 
-// Kollect errors
+/**
+ * Kollect query error types.
+ */
 sealed class KollectException {
     abstract val environment: Env
 
-    data class MissingIdentity<I : Any, A>(val i: I, val request: KollectQuery<I, A>, override val environment: Env) : KollectException()
+    data class MissingIdentity<I, A>(val i: I, val request: KollectQuery<I, A>, override val environment: Env) : KollectException()
     data class UnhandledException(val e: Throwable, override val environment: Env) : KollectException()
 
-    fun toThrowable() = NoStackTrace()
+    fun toThrowable() = NoStackTrace(this)
 }
 
-// In-progress request
+/**
+ * Ongoing request (currently in progress).
+ */
 data class BlockedRequest<F>(val request: KollectRequest, val result: (KollectStatus) -> arrow.Kind<F, Unit>)
 
-/* Combines the identities of two `KollectQuery` to the same data source. */
-private fun <I : Any, A> combineIdentities(x: KollectQuery<I, A>, y: KollectQuery<I, A>): NonEmptyList<I> =
+/**
+ * Combines the identities of two `KollectQuery` to the same data source.
+ */
+private fun <I, A> combineIdentities(x: KollectQuery<I, A>, y: KollectQuery<I, A>): NonEmptyList<I> =
     y.identities.foldLeft(x.identities) { acc, i ->
         if (acc.contains(i)) acc else NonEmptyList(acc.head, acc.tail + i)
     }
@@ -77,7 +87,7 @@ private fun <I : Any, A> combineIdentities(x: KollectQuery<I, A>, y: KollectQuer
 /**
  * Combines two requests to the same data source.
  */
-private fun <I : Any, A, F> combineRequests(MF: Monad<F>, x: BlockedRequest<F>, y: BlockedRequest<F>): BlockedRequest<F> {
+private fun <I, A, F> combineRequests(MF: Monad<F>, x: BlockedRequest<F>, y: BlockedRequest<F>): BlockedRequest<F> {
     val first = x.request
     val second = y.request
     return when {
@@ -164,7 +174,7 @@ private fun <I : Any, A, F> combineRequests(MF: Monad<F>, x: BlockedRequest<F>, 
 data class RequestMap<F>(val m: Map<DataSource<Any, Any>, BlockedRequest<F>>)
 
 /* Combine two `RequestMap` instances to batch requests to the same data source. */
-private fun <I : Any, A, F> combineRequestMaps(MF: Monad<F>, x: RequestMap<F>, y: RequestMap<F>): RequestMap<F> =
+private fun <I, A, F> combineRequestMaps(MF: Monad<F>, x: RequestMap<F>, y: RequestMap<F>): RequestMap<F> =
     RequestMap(x.m.foldLeft(y.m) { acc, tuple ->
         val combinedReq: BlockedRequest<F> = acc[tuple.key].toOption().fold({ tuple.value }, { combineRequests<I, A, F>(MF, tuple.value, it) })
         acc.filterNot { it.key == tuple.key } + mapOf(tuple.key to combinedReq)
@@ -195,7 +205,7 @@ sealed class Kollect<F, A> : KollectOf<F, A> {
 
         fun <F, A> error(AF: Applicative<F>, e: Throwable): Kollect<F, A> = exception(AF) { env -> KollectException.UnhandledException(e, env) }
 
-        operator fun <F, I : Any, A> invoke(AF: Concurrent<F>, id: I, ds: DataSource<I, A>): Kollect<F, A> =
+        operator fun <F, I, A> invoke(AF: Concurrent<F>, id: I, ds: DataSource<I, A>): Kollect<F, A> =
             Unkollect(AF.binding {
                 val deferred = Deferred<F, KollectStatus>(AF) as Deferred<F, KollectStatus>
                 val request = KollectQuery.KollectOne(id, ds)
@@ -490,7 +500,7 @@ sealed class Kollect<F, A> : KollectOf<F, A> {
 
 // Kollect ops
 @instance(Kollect::class)
-interface KollectMonad<F, Identity : Any, Result> : Monad<KollectPartialOf<F>> {
+interface KollectMonad<F, I, Result> : Monad<KollectPartialOf<F>> {
 
     fun MF(): Monad<F>
 
@@ -517,7 +527,7 @@ interface KollectMonad<F, Identity : Any, Result> : Monad<KollectPartialOf<F>> {
                 first is KollectResult.Done && second is KollectResult.Done -> KollectResult.Done(Tuple2(first.x, second.x))
                 first is KollectResult.Done && second is KollectResult.Blocked -> KollectResult.Blocked(second.rs, this@product.product(second.cont))
                 first is KollectResult.Blocked && second is KollectResult.Done -> KollectResult.Blocked(first.rs, first.cont.product(fb))
-                first is KollectResult.Blocked && second is KollectResult.Blocked -> KollectResult.Blocked(combineRequestMaps<Identity, Result, F>(MF(), first.rs, second.rs), first.cont.product(second.cont))
+                first is KollectResult.Blocked && second is KollectResult.Blocked -> KollectResult.Blocked(combineRequestMaps<I, Result, F>(MF(), first.rs, second.rs), first.cont.product(second.cont))
                 // second is KollectResult.Throw
                 else -> KollectResult.Throw((second as KollectResult.Throw).e)
             }

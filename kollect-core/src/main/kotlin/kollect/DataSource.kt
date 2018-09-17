@@ -19,10 +19,10 @@ object Sequentially : BatchExecution()
 object InParallel : BatchExecution()
 
 /**
- * A `DataSource` is the recipe for fetching a certain identity `I`, which yields
- * results of type `A`.
+ * A `DataSource` is the recipe for fetching a certain identity `I`, which yields results of type `A`.
  */
-interface DataSource<Identity, Result> {
+interface DataSource<I, A> {
+
     /**
      * Name given to the data source. It takes the string "KollectDataSource:${this.javaClass.simpleName}" as a default,
      * but can be overriden.
@@ -36,21 +36,21 @@ interface DataSource<Identity, Result> {
      * @return IO<Option<Result>> since this operation represents an IO computation that returns an optional result. In
      * case the result is not found, it'll return None.
      */
-    fun <F> fetch(CF: Concurrent<F>, id: Identity): Kind<F, Option<Result>>
+    fun <F> fetch(CF: Concurrent<F>, id: I): Kind<F, Option<A>>
 
     @Suppress("UNCHECKED_CAST")
     fun <F, G> batch(
         TT: Traverse<ForNonEmptyList>,
         CF: Concurrent<F>,
         P: Par<F, G>,
-        ids: NonEmptyList<Identity>
-    ): Kind<F, Map<Identity, Result>> = CF.run {
+        ids: NonEmptyList<I>
+    ): Kind<F, Map<I, A>> = CF.run {
         parTraverse(P.parallel(), TT, ids) { id ->
-            fetch(CF, id).map { (it as Kind<F, Result>).tupleLeft(id) }
+            fetch(CF, id).map { (it as Kind<F, A>).tupleLeft(id) }
         }.map {
-            it.collect<Kind<F, Tuple2<Identity, Result>>, Pair<Identity, Result>>(PartialFunction(
+            it.collect<Kind<F, Tuple2<I, A>>, Pair<I, A>>(PartialFunction(
                 definedAt = { value -> value is Some<*> },
-                ifDefined = { value -> (value as Some<Pair<Identity, Result>>).t }
+                ifDefined = { value -> (value as Some<Pair<I, A>>).t }
             )).toMap()
         }
     }
