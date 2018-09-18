@@ -8,7 +8,6 @@ import arrow.core.Some
 import arrow.core.Tuple2
 import arrow.effects.deferred.Deferred
 import arrow.effects.typeclasses.Async
-import arrow.effects.typeclasses.Effect
 import kollect.arrow.concurrent.FiniteDuration
 import kollect.arrow.concurrent.Ref
 import kollect.arrow.effects.Timer
@@ -130,7 +129,6 @@ interface Concurrent<F> : Async<F> {
      * use [[Concurrent$.liftIO Concurrent.liftIO]]
      * (on the object companion).
      *//*
-
     override def liftIO[A](ioa: IO[A]): F[A] = Concurrent.liftIO(ioa)(this)
     */
 
