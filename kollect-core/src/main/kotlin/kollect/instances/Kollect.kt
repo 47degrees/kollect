@@ -1,6 +1,6 @@
 @file:Suppress("FunctionName", "UNCHECKED_CAST")
 
-package kollect.instances
+package kollect
 
 import arrow.Kind
 import arrow.core.Either
@@ -12,14 +12,6 @@ import arrow.data.foldLeft
 import arrow.instance
 import arrow.typeclasses.Monad
 import arrow.typeclasses.binding
-import kollect.BlockedRequest
-import kollect.Kollect
-import kollect.KollectPartialOf
-import kollect.KollectQuery
-import kollect.KollectResult
-import kollect.KollectStatus
-import kollect.RequestMap
-import kollect.fix
 
 // Kollect ops
 @instance(Kollect::class)
