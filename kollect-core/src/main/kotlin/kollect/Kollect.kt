@@ -52,12 +52,12 @@ sealed class Kollect<F, A> : KollectOf<F, A> {
                 val blockedRequest = RequestMap(mapOf(anyDs to blocked))
 
                 KollectResult.Blocked(blockedRequest, Unkollect(
-                    deferred.get().flatMap {
+                    deferred.get().map {
                         when (it) {
-                            is KollectStatus.KollectDone<*> -> AF.just(KollectResult.Done<F, A>(it.result as A))
-                            is KollectStatus.KollectMissing -> AF.just(KollectResult.Throw<F, A> { env ->
-                                KollectException.MissingIdentity(id, request, env)
-                            })
+                            is KollectStatus.KollectDone<*> -> KollectResult.Done<F, A>(it.result as A)
+                            is KollectStatus.KollectMissing -> KollectResult.Throw<F, A> {
+                                env -> KollectException.MissingIdentity(id, request, env)
+                            }
                         }
                     }
                 ))
