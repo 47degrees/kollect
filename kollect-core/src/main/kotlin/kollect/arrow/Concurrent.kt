@@ -17,7 +17,7 @@ import java.util.concurrent.TimeoutException
 /**
  * Type class for [[Async]] data types that are cancelable and can be started concurrently.
  */
-interface Concurrent<F> : Effect<F> {
+interface Concurrent<F> : Async<F> {
 
     /**
      * Start concurrent execution of the source suspended in
