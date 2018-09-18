@@ -257,7 +257,7 @@ sealed class Kollect<F, A> : KollectOf<F, A> {
 
             // Remove cached IDs
             val idLookups = q.ids.traverse(C) { i ->
-                c.lookup(C, i, q.ds).map { m -> Tuple2(i, m) }
+                c.lookup(C, i, q.ds).tupleLeft(i)
             }.bind()
 
             val cachedResults = idLookups.collect<Tuple2<Any, Option<Any>>, Pair<Any, Any>>(PartialFunction(
