@@ -15,6 +15,7 @@ import arrow.typeclasses.binding
 import kollect.KollectResult.Blocked
 import kollect.KollectResult.Done
 import kollect.KollectResult.Throw
+import kollect.Kollect.Unkollect
 
 // Kollect ops
 @instance(Kollect::class)
@@ -22,10 +23,10 @@ interface KollectMonad<F, I, A> : Monad<KollectPartialOf<F>> {
 
     fun MF(): Monad<F>
 
-    override fun <A> just(a: A): Kollect<F, A> = Kollect.Unkollect(MF().just(Done(a)))
+    override fun <A> just(a: A): Kollect<F, A> = Unkollect(MF().just(Done(a)))
 
     override fun <A, B> Kind<KollectPartialOf<F>, A>.map(f: (A) -> B): Kollect<F, B> =
-        Kollect.Unkollect(MF().binding {
+        Unkollect(MF().binding {
             val kollect = this@map.fix().run.bind()
             val result = when (kollect) {
                 is Done -> Done<F, B>(f(kollect.x))
@@ -36,7 +37,7 @@ interface KollectMonad<F, I, A> : Monad<KollectPartialOf<F>> {
         })
 
     override fun <A, B> Kind<KollectPartialOf<F>, A>.product(fb: Kind<KollectPartialOf<F>, B>): Kollect<F, Tuple2<A, B>> =
-        Kollect.Unkollect(MF().binding {
+        Unkollect(MF().binding {
             val fab = MF().run { tupled(this@product.fix().run, fb.fix().run).bind() }
             val first = fab.a
             val second = fab.b
@@ -61,13 +62,13 @@ interface KollectMonad<F, I, A> : Monad<KollectPartialOf<F>> {
         }.fix()
 
     override fun <A, B> Kind<KollectPartialOf<F>, A>.flatMap(f: (A) -> Kind<KollectPartialOf<F>, B>): Kollect<F, B> =
-        Kollect.Unkollect(MF().binding {
+        Unkollect(MF().binding {
             val kollect = this@flatMap.fix().run.bind()
             val result: Kollect<F, B> = when (kollect) {
                 is Done -> f(kollect.x).fix()
-                is Throw -> Kollect.Unkollect(MF().just(Throw(kollect.e)))
+                is Throw -> Unkollect(MF().just(Throw(kollect.e)))
                 // kollect is Blocked
-                else -> Kollect.Unkollect(MF().just(Blocked((kollect as Blocked).rs, kollect.cont.flatMap(f))))
+                else -> Unkollect(MF().just(Blocked((kollect as Blocked).rs, kollect.cont.flatMap(f))))
             }
             result.run.bind()
         })
