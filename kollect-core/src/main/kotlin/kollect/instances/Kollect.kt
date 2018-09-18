@@ -12,10 +12,12 @@ import arrow.data.foldLeft
 import arrow.instance
 import arrow.typeclasses.Monad
 import arrow.typeclasses.binding
+import kollect.Kollect.Unkollect
+import kollect.KollectQuery.Batch
+import kollect.KollectQuery.KollectOne
 import kollect.KollectResult.Blocked
 import kollect.KollectResult.Done
 import kollect.KollectResult.Throw
-import kollect.Kollect.Unkollect
 
 // Kollect ops
 @instance(Kollect::class)
@@ -89,18 +91,18 @@ private fun <I, A, F> combineRequests(MF: Monad<F>, x: BlockedRequest<F>, y: Blo
     val first = x.request
     val second = y.request
     return when {
-        first is KollectQuery.KollectOne<*, *> && second is KollectQuery.KollectOne<*, *> -> {
-            val firstOp = (first as KollectQuery.KollectOne<I, A>)
-            val secondOp = (second as KollectQuery.KollectOne<I, A>)
+        first is KollectOne<*, *> && second is KollectOne<*, *> -> {
+            val firstOp = (first as KollectOne<I, A>)
+            val secondOp = (second as KollectOne<I, A>)
             val aId = firstOp.id
             val ds = firstOp.ds
             val anotherId = secondOp.id
             if (aId == anotherId) {
-                val newRequest = KollectQuery.KollectOne(aId, ds)
+                val newRequest = KollectOne(aId, ds)
                 val newResult = { r: KollectStatus -> MF.run { tupled(x.result(r), y.result(r)).flatMap { MF.just(Unit) } } }
                 BlockedRequest(newRequest, newResult)
             } else {
-                val newRequest = KollectQuery.Batch(combineIdentities(firstOp, secondOp), ds)
+                val newRequest = Batch(combineIdentities(firstOp, secondOp), ds)
                 val newResult = { r: KollectStatus ->
                     when (r) {
                         is KollectStatus.KollectDone<*> -> {
@@ -117,13 +119,13 @@ private fun <I, A, F> combineRequests(MF: Monad<F>, x: BlockedRequest<F>, y: Blo
                 BlockedRequest(newRequest, newResult)
             }
         }
-        first is KollectQuery.KollectOne<*, *> && second is KollectQuery.Batch<*, *> -> {
-            val firstOp = (first as KollectQuery.KollectOne<I, A>)
-            val secondOp = (second as KollectQuery.Batch<I, A>)
+        first is KollectOne<*, *> && second is Batch<*, *> -> {
+            val firstOp = (first as KollectOne<I, A>)
+            val secondOp = (second as Batch<I, A>)
             val oneId = firstOp.id
             val ds = firstOp.ds
 
-            val newRequest = KollectQuery.Batch(combineIdentities(firstOp, secondOp), ds)
+            val newRequest = Batch(combineIdentities(firstOp, secondOp), ds)
             val newResult = { r: KollectStatus ->
                 when (r) {
                     is KollectStatus.KollectDone<*> -> {
@@ -136,13 +138,13 @@ private fun <I, A, F> combineRequests(MF: Monad<F>, x: BlockedRequest<F>, y: Blo
             }
             BlockedRequest(newRequest, newResult)
         }
-        first is KollectQuery.Batch<*, *> && second is KollectQuery.KollectOne<*, *> -> {
-            val firstOp = (first as KollectQuery.Batch<I, A>)
-            val secondOp = (second as KollectQuery.KollectOne<I, A>)
+        first is Batch<*, *> && second is KollectOne<*, *> -> {
+            val firstOp = (first as Batch<I, A>)
+            val secondOp = (second as KollectOne<I, A>)
             val oneId = secondOp.id
             val ds = firstOp.ds
 
-            val newRequest = KollectQuery.Batch(combineIdentities(firstOp, secondOp), ds)
+            val newRequest = Batch(combineIdentities(firstOp, secondOp), ds)
             val newResult = { r: KollectStatus ->
                 when (r) {
                     is KollectStatus.KollectDone<*> -> {
@@ -155,13 +157,13 @@ private fun <I, A, F> combineRequests(MF: Monad<F>, x: BlockedRequest<F>, y: Blo
             }
             BlockedRequest(newRequest, newResult)
         }
-        // first is KollectQuery.Batch<*, *> && second is KollectQuery.Batch<*, *>
+        // first is Batch<*, *> && second is Batch<*, *>
         else -> {
-            val firstOp = (first as KollectQuery.Batch<I, A>)
-            val secondOp = (second as KollectQuery.Batch<I, A>)
+            val firstOp = (first as Batch<I, A>)
+            val secondOp = (second as Batch<I, A>)
             val ds = firstOp.ds
 
-            val newRequest = KollectQuery.Batch(combineIdentities(firstOp, secondOp), ds)
+            val newRequest = Batch(combineIdentities(firstOp, secondOp), ds)
             val newResult = { r: KollectStatus -> MF.run { tupled(x.result(r), y.result(r)).flatMap { MF.just(Unit) } } }
             BlockedRequest(newRequest, newResult)
         }
