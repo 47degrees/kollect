@@ -65,17 +65,15 @@ interface KollectMonad<F, I, A> : Monad<KollectPartialOf<F>> {
             }
         }.fix()
 
-    override fun <A, B> Kind<KollectPartialOf<F>, A>.flatMap(f: (A) -> Kind<KollectPartialOf<F>, B>): Kollect<F, B> =
-        Unkollect(MF().binding {
-            val kollect = this@flatMap.fix().run.bind()
-            val result: Kollect<F, B> = when (kollect) {
-                is Done -> f(kollect.x).fix()
-                is Throw -> Unkollect(MF().just(Throw(kollect.e)))
-                // kollect is Blocked
-                else -> Unkollect(MF().just(Blocked((kollect as Blocked).rs, kollect.cont.flatMap(f))))
+    override fun <A, B> Kind<KollectPartialOf<F>, A>.flatMap(f: (A) -> Kind<KollectPartialOf<F>, B>): Kollect<F, B> = MF().run {
+        Unkollect(this@flatMap.fix().run.flatMap {
+            when (it) {
+                is Done -> f(it.x).fix().run
+                is Throw -> MF().just(Throw(it.e))
+                is Blocked -> MF().just(Blocked(it.rs, it.cont.flatMap(f)))
             }
-            result.run.bind()
         })
+    }
 }
 
 /* Combine two `RequestMap` instances to batch requests to the same data source. */
