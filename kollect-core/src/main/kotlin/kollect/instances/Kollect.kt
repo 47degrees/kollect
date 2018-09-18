@@ -12,6 +12,9 @@ import arrow.data.foldLeft
 import arrow.instance
 import arrow.typeclasses.Monad
 import arrow.typeclasses.binding
+import kollect.KollectResult.Blocked
+import kollect.KollectResult.Done
+import kollect.KollectResult.Throw
 
 // Kollect ops
 @instance(Kollect::class)
@@ -19,15 +22,15 @@ interface KollectMonad<F, I, A> : Monad<KollectPartialOf<F>> {
 
     fun MF(): Monad<F>
 
-    override fun <A> just(a: A): Kollect<F, A> = Kollect.Unkollect(MF().just(KollectResult.Done(a)))
+    override fun <A> just(a: A): Kollect<F, A> = Kollect.Unkollect(MF().just(Done(a)))
 
     override fun <A, B> Kind<KollectPartialOf<F>, A>.map(f: (A) -> B): Kollect<F, B> =
         Kollect.Unkollect(MF().binding {
             val kollect = this@map.fix().run.bind()
             val result = when (kollect) {
-                is KollectResult.Done -> KollectResult.Done<F, B>(f(kollect.x))
-                is KollectResult.Blocked -> KollectResult.Blocked(kollect.rs, kollect.cont.map(f))
-                is KollectResult.Throw -> KollectResult.Throw(kollect.e)
+                is Done -> Done<F, B>(f(kollect.x))
+                is Blocked -> Blocked(kollect.rs, kollect.cont.map(f))
+                is Throw -> Throw(kollect.e)
             }
             result
         })
@@ -38,13 +41,13 @@ interface KollectMonad<F, I, A> : Monad<KollectPartialOf<F>> {
             val first = fab.a
             val second = fab.b
             val result = when {
-                first is KollectResult.Throw -> KollectResult.Throw<F, Tuple2<A, B>>(first.e)
-                first is KollectResult.Done && second is KollectResult.Done -> KollectResult.Done(Tuple2(first.x, second.x))
-                first is KollectResult.Done && second is KollectResult.Blocked -> KollectResult.Blocked(second.rs, this@product.product(second.cont))
-                first is KollectResult.Blocked && second is KollectResult.Done -> KollectResult.Blocked(first.rs, first.cont.product(fb))
-                first is KollectResult.Blocked && second is KollectResult.Blocked -> KollectResult.Blocked(combineRequestMaps<I, A, F>(MF(), first.rs, second.rs), first.cont.product(second.cont))
-                // second is KollectResult.Throw
-                else -> KollectResult.Throw((second as KollectResult.Throw).e)
+                first is Throw -> Throw<F, Tuple2<A, B>>(first.e)
+                first is Done && second is Done -> Done(Tuple2(first.x, second.x))
+                first is Done && second is Blocked -> Blocked(second.rs, this@product.product(second.cont))
+                first is Blocked && second is Done -> Blocked(first.rs, first.cont.product(fb))
+                first is Blocked && second is Blocked -> Blocked(combineRequestMaps<I, A, F>(MF(), first.rs, second.rs), first.cont.product(second.cont))
+                // second is Throw
+                else -> Throw((second as Throw).e)
             }
             result
         })
@@ -61,10 +64,10 @@ interface KollectMonad<F, I, A> : Monad<KollectPartialOf<F>> {
         Kollect.Unkollect(MF().binding {
             val kollect = this@flatMap.fix().run.bind()
             val result: Kollect<F, B> = when (kollect) {
-                is KollectResult.Done -> f(kollect.x).fix()
-                is KollectResult.Throw -> Kollect.Unkollect(MF().just(KollectResult.Throw(kollect.e)))
-                // kollect is KollectResult.Blocked
-                else -> Kollect.Unkollect(MF().just(KollectResult.Blocked((kollect as KollectResult.Blocked).rs, kollect.cont.flatMap(f))))
+                is Done -> f(kollect.x).fix()
+                is Throw -> Kollect.Unkollect(MF().just(Throw(kollect.e)))
+                // kollect is Blocked
+                else -> Kollect.Unkollect(MF().just(Blocked((kollect as Blocked).rs, kollect.cont.flatMap(f))))
             }
             result.run.bind()
         })
