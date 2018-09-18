@@ -55,8 +55,8 @@ sealed class Kollect<F, A> : KollectOf<F, A> {
                     deferred.get().map {
                         when (it) {
                             is KollectStatus.KollectDone<*> -> KollectResult.Done<F, A>(it.result as A)
-                            is KollectStatus.KollectMissing -> KollectResult.Throw<F, A> {
-                                env -> KollectException.MissingIdentity(id, request, env)
+                            is KollectStatus.KollectMissing -> KollectResult.Throw<F, A> { env ->
+                                KollectException.MissingIdentity(id, request, env)
                             }
                         }
                     }
@@ -221,20 +221,20 @@ sealed class Kollect<F, A> : KollectOf<F, A> {
             val maybeCached = c.lookup(C, q.id, q.ds).bind()
             val result = when (maybeCached) {
                 // Cached
-                is Some -> putResult(KollectStatus.KollectDone(maybeCached.t)).flatMap { C.just(listOf<Request>()) }
+                is Some -> putResult(KollectStatus.KollectDone(maybeCached.t)).`as`(listOf())
                 is None -> binding {
                     val startTime = TF.clock().monotonic(TimeUnit.MILLISECONDS).bind()
                     val o = q.ds.fetch(C, q.id).bind()
                     val endTime = TF.clock().monotonic(TimeUnit.MILLISECONDS).bind()
                     val res = when (o) {
-                        // Fetched
+                        // Kollected
                         is Some -> binding {
                             val newC = c.insert(C, q.id, o.t, q.ds).bind()
                             cache.set(newC).bind()
                             putResult(KollectStatus.KollectDone(o.t)).bind()
                             listOf(Request(q, startTime, endTime))
                         }
-                        is None -> putResult(KollectStatus.KollectMissing).flatMap { C.just(listOf(Request(q, startTime, endTime))) }
+                        is None -> putResult(KollectStatus.KollectMissing).`as`(listOf(Request(q, startTime, endTime)))
                     }.bind()
                     res
                 }
