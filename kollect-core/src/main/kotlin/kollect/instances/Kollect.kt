@@ -99,7 +99,7 @@ private fun <I, A, F> combineRequests(MF: Monad<F>, x: BlockedRequest<F>, y: Blo
             val anotherId = secondOp.id
             if (aId == anotherId) {
                 val newRequest = KollectOne(aId, ds)
-                val newResult = { r: KollectStatus -> MF.run { tupled(x.result(r), y.result(r)).flatMap { MF.just(Unit) } } }
+                val newResult = { r: KollectStatus -> MF.run { tupled(x.result(r), y.result(r)).void() } }
                 BlockedRequest(newRequest, newResult)
             } else {
                 val newRequest = Batch(combineIdentities(firstOp, secondOp), ds)
@@ -109,11 +109,11 @@ private fun <I, A, F> combineRequests(MF: Monad<F>, x: BlockedRequest<F>, y: Blo
                             r.result as Map<*, *>
                             val xResult = r.result[aId].toOption().map { KollectDone(it) }.getOrElse { KollectMissing }
                             val yResult = r.result[anotherId].toOption().map { KollectDone(it) }.getOrElse { KollectMissing }
-                            MF.run { tupled(x.result(xResult), y.result(yResult)).flatMap { MF.just(Unit) } }
+                            MF.run { tupled(x.result(xResult), y.result(yResult)).void() }
                         }
 
                         is KollectMissing ->
-                            MF.run { tupled(x.result(r), y.result(r)).flatMap { MF.just(Unit) } }
+                            MF.run { tupled(x.result(r), y.result(r)).void() }
                     }
                 }
                 BlockedRequest(newRequest, newResult)
@@ -131,9 +131,9 @@ private fun <I, A, F> combineRequests(MF: Monad<F>, x: BlockedRequest<F>, y: Blo
                     is KollectDone<*> -> {
                         r.result as Map<*, *>
                         val oneResult = r.result[oneId].toOption().map { KollectDone(it) }.getOrElse { KollectMissing }
-                        MF.run { tupled(x.result(oneResult), y.result(r)).flatMap { MF.just(Unit) } }
+                        MF.run { tupled(x.result(oneResult), y.result(r)).void() }
                     }
-                    is KollectMissing -> MF.run { tupled(x.result(r), y.result(r)).flatMap { MF.just(Unit) } }
+                    is KollectMissing -> MF.run { tupled(x.result(r), y.result(r)).void() }
                 }
             }
             BlockedRequest(newRequest, newResult)
@@ -150,9 +150,9 @@ private fun <I, A, F> combineRequests(MF: Monad<F>, x: BlockedRequest<F>, y: Blo
                     is KollectDone<*> -> {
                         r.result as Map<*, *>
                         val oneResult = r.result[oneId].toOption().map { KollectDone(it) }.getOrElse { KollectMissing }
-                        MF.run { tupled(x.result(r), y.result(oneResult)).flatMap { MF.just(Unit) } }
+                        MF.run { tupled(x.result(r), y.result(oneResult)).void() }
                     }
-                    is KollectMissing -> MF.run { tupled(x.result(r), y.result(r)).flatMap { MF.just(Unit) } }
+                    is KollectMissing -> MF.run { tupled(x.result(r), y.result(r)).void() }
                 }
             }
             BlockedRequest(newRequest, newResult)
@@ -164,7 +164,7 @@ private fun <I, A, F> combineRequests(MF: Monad<F>, x: BlockedRequest<F>, y: Blo
             val ds = firstOp.ds
 
             val newRequest = Batch(combineIdentities(firstOp, secondOp), ds)
-            val newResult = { r: KollectStatus -> MF.run { tupled(x.result(r), y.result(r)).flatMap { MF.just(Unit) } } }
+            val newResult = { r: KollectStatus -> MF.run { tupled(x.result(r), y.result(r)).void() } }
             BlockedRequest(newRequest, newResult)
         }
     }
