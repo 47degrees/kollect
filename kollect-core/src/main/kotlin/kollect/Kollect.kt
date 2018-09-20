@@ -63,6 +63,25 @@ sealed class Kollect<F, A> : KollectOf<F, A> {
                 ))
             })
 
+        fun <F, I, A> optional(AF: Concurrent<F>, id: I, ds: DataSource<I, A>): Kollect<F, Option<A>> =
+            Unkollect(AF.binding {
+                val deferred = Deferred<F, KollectStatus>(AF) as Deferred<F, KollectStatus>
+                val request = KollectQuery.KollectOne(id, ds)
+                val result = { a: KollectStatus -> deferred.complete(a) }
+                val blocked = BlockedRequest(request, result)
+                val anyDs = ds as DataSource<Any, Any>
+                val blockedRequest = RequestMap(mapOf(anyDs to blocked))
+
+                KollectResult.Blocked(blockedRequest, Unkollect(
+                    deferred.get().map {
+                        when (it) {
+                            is KollectStatus.KollectDone<*> -> KollectResult.Done<F, Option<A>>(Some(it.result as A))
+                            is KollectStatus.KollectMissing -> KollectResult.Done(Option.empty())
+                        }
+                    }
+                ))
+            })
+
         /**
          * Run a `Kollect`, the result in the `F` monad.
          */
