@@ -10,7 +10,7 @@ import arrow.instance
 import arrow.typeclasses.MonadError
 import kollect.arrow.ExitCase.Failing
 
-sealed class ExitCase<E> {
+sealed class ExitCase<out E> {
 
     object Completed : ExitCase<Nothing>()
 

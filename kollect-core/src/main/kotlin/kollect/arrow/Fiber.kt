@@ -65,7 +65,7 @@ abstract class Fiber<F, A> : FiberOf<F, A> {
         /**
          * Given a `join` and `cancel` tuple, builds a [[Fiber]] value.
          */
-        fun <F, A> just(join: arrow.Kind<F, A>, cancel: CancelToken<F>): Fiber<F, A> =
+        operator fun <F, A> invoke(join: arrow.Kind<F, A>, cancel: CancelToken<F>): Fiber<F, A> =
             Tuple(join, cancel)
 
         private data class Tuple<F, A>(val join: arrow.Kind<F, A>, val cancel: CancelToken<F>) : Fiber<F, A>() {

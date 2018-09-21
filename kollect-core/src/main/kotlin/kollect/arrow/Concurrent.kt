@@ -1,13 +1,36 @@
+@file:Suppress("FunctionName")
+
 package arrow.effects
 
 import arrow.Kind
+import arrow.concurrent.Promise
 import arrow.core.Either
+import arrow.core.Left
 import arrow.core.None
 import arrow.core.Option
+import arrow.core.Right
 import arrow.core.Some
+import arrow.core.Success
 import arrow.core.Tuple2
+import arrow.core.andThen
+import arrow.core.right
+import arrow.core.some
+import arrow.data.EitherT
+import arrow.data.EitherTPartialOf
+import arrow.data.Kleisli
+import arrow.data.KleisliPartialOf
+import arrow.data.OptionT
+import arrow.data.OptionTPartialOf
+import arrow.data.WriterT
+import arrow.data.WriterTPartialOf
+import arrow.data.fix
 import arrow.effects.deferred.Deferred
 import arrow.effects.typeclasses.Async
+import arrow.instance
+import arrow.typeclasses.Monoid
+import kollect.arrow.Bracket
+import kollect.arrow.ExitCase
+import kollect.arrow.TrampolineEC.Companion.immediate
 import kollect.arrow.concurrent.FiniteDuration
 import kollect.arrow.concurrent.Ref
 import kollect.arrow.effects.Timer
@@ -16,7 +39,7 @@ import java.util.concurrent.TimeoutException
 /**
  * Type class for [[Async]] data types that are cancelable and can be started concurrently.
  */
-interface Concurrent<F> : Async<F> {
+interface Concurrent<F> : Async<F>, Bracket<F, Throwable> {
 
     /**
      * Start concurrent execution of the source suspended in
@@ -36,25 +59,11 @@ interface Concurrent<F> : Async<F> {
      * If the first task completes in error, then the result will
      * complete in error, the other task being canceled.
      *
-     * On usage the user has the option of canceling the losing task,
-     * this being equivalent with plain [[race]]:
-     *
-     * {{{
-     *   val ioA: IO[A] = ???
-     *   val ioB: IO[B] = ???
-     *
-     *   Concurrent[IO].racePair(ioA, ioB).flatMap {
-     *     case Left((a, fiberB)) =>
-     *       fiberB.cancel.map(_ => a)
-     *     case Right((fiberA, b)) =>
-     *       fiberA.cancel.map(_ => b)
-     *   }
-     * }}}
+     * On usage the user has the option of canceling the losing task.
      *
      * See [[race]] for a simpler version that cancels the loser
      * immediately.
      */
-
     fun <A, B> racePair(fa: arrow.Kind<F, A>, fb: arrow.Kind<F, B>): arrow.Kind<F, Either<Tuple2<A, Fiber<F, B>>, Tuple2<Fiber<F, A>, B>>>
 
     /**
@@ -69,7 +78,6 @@ interface Concurrent<F> : Async<F> {
      * Also see [[racePair]] for a version that does not cancel
      * the loser automatically on successful results.
      */
-
     fun <A, B> race(fa: arrow.Kind<F, A>, fb: arrow.Kind<F, B>): arrow.Kind<F, Either<A, B>> =
         racePair(fa, fb).flatMap { either ->
             when (either) {
@@ -91,26 +99,6 @@ interface Concurrent<F> : Async<F> {
      * alias for `F[Unit]`, capturing the logic necessary for
      * canceling the asynchronous process for as long as it
      * is still active.
-     *
-     * Example:
-     *
-     * {{{
-     *   import java.util.concurrent.ScheduledExecutorService
-     *   import scala.concurrent.duration._
-     *
-     *   def sleep[F[_]](d: FiniteDuration)
-     *     (implicit F: Concurrent[F], ec: ScheduledExecutorService): F[Unit] = {
-     *
-     *     F.cancelable { cb =>
-     *       // Schedules task to run after delay
-     *       val run = new Runnable { def run() = cb(Right(())) }
-     *       val future = ec.schedule(run, d.length, d.unit)
-     *
-     *       // Cancellation logic, suspended in F
-     *       F.delay(future.cancel(true))
-     *     }
-     *   }
-     * }}}
      */
     fun <A> cancelable(k: ((Either<Throwable, A>) -> Unit) -> CancelToken<F>): arrow.Kind<F, A> =
         Concurrent.defaultCancelable(this, k)
@@ -118,20 +106,16 @@ interface Concurrent<F> : Async<F> {
     // TODO uncomment when we can add this data type to Arrow. IO.Pure, IO.RaiseError and the rest of the
     // TODO implementations of the sealed class IO are internal in Arrow.
     /**
-     * Inherited from [[LiftIO]], defines a conversion from [[IO]]
-     * in terms of the `Concurrent` type class.
+     * Inherited from LiftIO, defines a conversion from [[IO]] in terms of the `Concurrent` type class.
      *
-     * N.B. expressing this conversion in terms of `Concurrent` and
-     * its capabilities means that the resulting `F` is cancelable in
-     * case the source `IO` is.
+     * N.B. expressing this conversion in terms of `Concurrent` and its capabilities means that the resulting `F` is
+     * cancelable in case the source `IO` is.
      *
-     * To access this implementation as a standalone function, you can
-     * use [[Concurrent$.liftIO Concurrent.liftIO]]
+     * To access this implementation as a standalone function, you can use [[Concurrent$.liftIO Concurrent.liftIO]]
      * (on the object companion).
      *//*
     override def liftIO[A](ioa: IO[A]): F[A] = Concurrent.liftIO(ioa)(this)
     */
-
     companion object {
         // TODO uncomment when we can add this data type to Arrow. IO.Pure, IO.RaiseError and the rest of the
         // TODO implementations of the sealed class IO are internal in Arrow.
@@ -227,229 +211,185 @@ interface Concurrent<F> : Async<F> {
             timeoutTo(CF, TF, fa, duration, CF.raiseError(TimeoutException(duration.toString())))
 
         /**
-         * Internal API — Cancelable builder derived from
-         * [[Async.asyncF]] and [[Bracket.bracketCase]].
+         * Internal API — Cancelable builder derived from [[Async.asyncF]] and [[Bracket.bracketCase]].
          */
-        private fun <F, A> defaultCancelable(AF: Async<F>, k: ((Either<Throwable, A>) -> Unit) -> CancelToken<F>): Kind<F, A> =
-            TODO()
-//            AF.async { cb ->
-//
-//                val latch = Promise<Unit>()
-//                val latchF = AF.async<Unit> { cb -> latch.future().onComplete(immediate) { cb(Right(Unit)) } }
-//                // Side-effecting call; unfreezes latch in order to allow bracket to finish
-//
-//                val token = k { result ->
-//                    latch.complete(Success(Unit))
-//                    cb(result)
-//                }
-//                AF.bracketCase(AF.just(token))(_ => latchF) {
-//                case(cancel, Canceled) => cancel
-//                case _ => F . unit
-//            }
-//            }
-    }
-
-    // def async[A](k: (Either[Throwable, A] => Unit) => Unit): F[A]
-    // def asyncF[A](k: (Either[Throwable, A] => Unit) => F[Unit]): F[A]
-}
-/**
- * [[Concurrent]] instance built for `cats.data.OptionT` values initialized
- * with any `F` data type that also implements `Concurrent`.
- *//*
-
-        implicit def catsOptionTConcurrent[F[_]: Concurrent]: Concurrent[OptionT[F, ?]] =
-        new OptionTConcurrent[F]
-        { def F = Concurrent [F] }
-
-        */
-/**
- * [[Concurrent]] instance built for `cats.data.Kleisli` values initialized
- * with any `F` data type that also implements `Concurrent`.
- *//*
-
-        implicit def catsKleisliConcurrent[F[_]: Concurrent, R]: Concurrent[Kleisli[F, R, ?]] =
-        new KleisliConcurrent[F, R]
-        { def F = Concurrent [F] }
-
-        */
-/**
- * [[Concurrent]] instance built for `cats.data.WriterT` values initialized
- * with any `F` data type that also implements `Concurrent`.
- *//*
-
-        implicit def catsWriterTConcurrent[F[_]: Concurrent, L: Monoid]: Concurrent[WriterT[F, L, ?]] =
-        new WriterTConcurrent[F, L]
-        { def F = Concurrent [F]; def L = Monoid [L] }
-
-        private [effect] trait EitherTConcurrent[F[_], L] extends Async.EitherTAsync[F, L]
-        with Concurrent[EitherT[F, L, ?]]
-        {
-
-            override protected implicit def F: Concurrent[F]
-            override protected def FF = F
-
-                // Needed to drive static checks, otherwise the
-                // compiler will choke on type inference :-(
-                type Fiber [A] = cats.effect.Fiber[EitherT[F, L, ?], A]
-
-            override def cancelable[A](k:(Either[Throwable, A] => Unit) => CancelToken[EitherT[F, L, ?]]): EitherT[F, L, A] =
-            EitherT.liftF(F.cancelable(k.andThen(_.value.map(_ =>()))))(F)
-
-            override def start[A](fa: EitherT[ F, L, A]) =
-            EitherT.liftF(F.start(fa.value).map(fiberT))
-
-            override def racePair[A, B](fa: EitherT[ F, L, A], fb: EitherT[F, L, B]): EitherT[F, L, Either[(A, Fiber[B]), (Fiber[A], B)]] =
-            EitherT(F.racePair(fa.value, fb.value).flatMap {
-                case Left ((value, fiberB)) =>
-                value match {
-                    case Left (_) =>
-                    fiberB.cancel.map(_ => value . asInstanceOf [Left[L, Nothing]])
-                    case Right (r) =>
-                    F.pure(Right(Left((r, fiberT[B](fiberB)))))
+        private fun <F, A> defaultCancelable(AF: Concurrent<F>, k: ((Either<Throwable, A>) -> Unit) -> CancelToken<F>): Kind<F, A> =
+            AF.async { cb ->
+                val latch = Promise<Unit>()
+                val latchF = AF.async<Unit> { cb ->
+                    latch.future().onComplete(immediate) { cb(Right(Unit)) }
                 }
-                case Right ((fiberA, value)) =>
-                value match {
-                    case Left (_) =>
-                    fiberA.cancel.map(_ => value . asInstanceOf [Left[L, Nothing]])
-                    case Right (r) =>
-                    F.pure(Right(Right((fiberT[A](fiberA), r))))
-                }
-            })
-
-            protected def fiberT[A](fiber: effect. Fiber [F, Either[L, A]]): Fiber[A] =
-            Fiber(EitherT(fiber.join), EitherT.liftF(fiber.cancel))
-        }
-
-        private [effect] trait OptionTConcurrent[F[_]] extends Async.OptionTAsync[F]
-        with Concurrent[OptionT[F, ?]]
-        {
-
-            override protected implicit def F: Concurrent[F]
-            override protected def FF = F
-
-                // Needed to drive static checks, otherwise the
-                // compiler will choke on type inference :-(
-                type Fiber [A] = cats.effect.Fiber[OptionT[F, ?], A]
-
-            override def cancelable[A](k:(Either[Throwable, A] => Unit) => CancelToken[OptionT[F, ?]]): OptionT[F, A] =
-            OptionT.liftF(F.cancelable(k.andThen(_.value.map(_ =>()))))(F)
-
-            override def start[A](fa: OptionT[ F, A]) =
-            OptionT.liftF(F.start(fa.value).map(fiberT))
-
-            override def racePair[A, B](fa: OptionT[ F, A], fb: OptionT[F, B]): OptionT[F, Either[(A, Fiber[B]), (Fiber[A], B)]] =
-            OptionT(F.racePair(fa.value, fb.value).flatMap {
-                case Left ((value, fiberB)) =>
-                value match {
-                    case None =>
-                    fiberB.cancel.map(_ => None)
-                    case Some (r) =>
-                    F.pure(Some(Left((r, fiberT[B](fiberB)))))
-                }
-                case Right ((fiberA, value)) =>
-                value match {
-                    case None =>
-                    fiberA.cancel.map(_ => None)
-                    case Some (r) =>
-                    F.pure(Some(Right((fiberT[A](fiberA), r))))
-                }
-            })
-
-            protected def fiberT[A](fiber: effect. Fiber [F, Option[A]]): Fiber[A] =
-            Fiber(OptionT(fiber.join), OptionT.liftF(fiber.cancel))
-        }
-
-
-        private [effect] trait WriterTConcurrent[F[_], L] extends Async.WriterTAsync[F, L]
-        with Concurrent[WriterT[F, L, ?]]
-        {
-
-            override protected implicit def F: Concurrent[F]
-            override protected def FA = F
-
-                // Needed to drive static checks, otherwise the
-                // compiler will choke on type inference :-(
-                type Fiber [A] = cats.effect.Fiber[WriterT[F, L, ?], A]
-
-            override def cancelable[A](k:(Either[Throwable, A] => Unit) => CancelToken[WriterT[F, L, ?]]): WriterT[F, L, A] =
-            WriterT.liftF(F.cancelable(k.andThen(_.run.map(_ =>()))))(L, F)
-
-            override def start[A](fa: WriterT[ F, L, A]) =
-            WriterT(F.start(fa.run).map {
-                fiber =>
-                (L.empty, fiberT[A](fiber))
-            })
-
-            override def racePair[A, B](fa: WriterT[ F, L, A], fb: WriterT[F, L, B]): WriterT[F, L, Either[(A, Fiber[B]), (Fiber[A], B)]] =
-            WriterT(F.racePair(fa.run, fb.run).map {
-                case Left (((l, value), fiber)) =>
-                (l, Left((value, fiberT(fiber))))
-                case Right ((fiber, (l, value))) =>
-                (l, Right((fiberT(fiber), value)))
-            })
-
-            protected def fiberT[A](fiber: effect. Fiber [F, (L, A)]): Fiber[A] =
-            Fiber(WriterT(fiber.join), WriterT.liftF(fiber.cancel))
-        }
-
-        private [effect]
-        abstract class KleisliConcurrent[F[_], R]
-        extends Async.KleisliAsync[F, R]
-        with Concurrent[Kleisli[F, R, ?]]
-        {
-
-            override protected implicit def F: Concurrent[F]
-            // Needed to drive static checks, otherwise the
-            // compiler can choke on type inference :-(
-            type Fiber [A] = cats.effect.Fiber[Kleisli[F, R, ?], A]
-
-            override def cancelable[A](k:(Either[Throwable, A] => Unit) => CancelToken[Kleisli[F, R, ?]]): Kleisli[F, R, A] =
-            Kleisli(r => F . cancelable (k.andThen(_.run(r).map(_ =>()))))
-
-            override def start[A](fa: Kleisli[ F, R, A]): Kleisli[F, R, Fiber[A]] =
-            Kleisli(r => F . start (fa.run(r)).map(fiberT))
-
-            override def racePair[A, B](fa: Kleisli[ F, R, A], fb: Kleisli[F, R, B]) =
-            Kleisli {
-                r =>
-                F.racePair(fa.run(r), fb.run(r)).map {
-                    case Left ((a, fiber)) => Left((a, fiberT[B](fiber)))
-                    case Right ((fiber, b)) => Right((fiberT[A](fiber), b))
-                }
-            }
-
-            protected def fiberT[A](fiber: effect. Fiber [F, A]): Fiber[A] =
-            Fiber(Kleisli.liftF(fiber.join), Kleisli.liftF(fiber.cancel))
-        }
-
-        */
-/**
- * Internal API — Cancelable builder derived from
- * [[Async.asyncF]] and [[Bracket.bracketCase]].
- *//*
-
-        private def defaultCancelable[F[_], A](k: (Either[Throwable, A] => Unit) => CancelToken[F])
-        (implicit F: Async[F]): F[A] =
-        {
-
-            F.asyncF[A] {
-                cb =>
-                // For back-pressuring bracketCase until the callback gets called.
-                // Need to work with `Promise` due to the callback being side-effecting.
-                val latch = Promise[Unit]()
-                val latchF = F.async[Unit](cb => latch . future . onComplete (_ => cb(rightUnit))(immediate))
                 // Side-effecting call; unfreezes latch in order to allow bracket to finish
-                val token = k {
-                    result =>
-                    latch.complete(successUnit)
+                val token = k { result ->
+                    latch.complete(Success(Unit))
                     cb(result)
                 }
-                F.bracketCase(F.pure(token))(_ => latchF) {
-                case(cancel, Canceled) => cancel
-                case _ => F . unit
+                AF.run {
+                    AF.just(token).bracketCase({ a, b ->
+                        when (b) {
+                            is ExitCase.Cancelled -> a
+                            else -> AF.just(Unit)
+                        }
+                    }, { _ -> latchF })
+                }
             }
+    }
+}
+
+@instance(Concurrent::class)
+interface EitherTConcurrent<F, L> : Concurrent<EitherTPartialOf<F, L>> {
+    fun CF(): Concurrent<F>
+
+    override fun <A> cancelable(k: ((Either<Throwable, A>) -> Unit) -> CancelToken<EitherTPartialOf<F, L>>): Kind<EitherTPartialOf<F, L>, A> = CF().run {
+        EitherT(CF().cancelable(k.andThen { token -> token.fix().value.map { Unit } }).map { it.right() })
+    }
+
+    override fun <A> start(fa: Kind<EitherTPartialOf<F, L>, A>): Kind<EitherTPartialOf<F, L>, Fiber<EitherTPartialOf<F, L>, A>> = CF().run {
+        EitherT(CF().start(fa.fix().value).map { fiberT(it) }.map { it.right() })
+    }
+
+    override fun <A, B> racePair(fa: Kind<EitherTPartialOf<F, L>, A>, fb: Kind<EitherTPartialOf<F, L>, B>): Kind<EitherTPartialOf<F, L>, Either<Tuple2<A, Fiber<EitherTPartialOf<F, L>, B>>, Tuple2<Fiber<EitherTPartialOf<F, L>, A>, B>>> = CF().run {
+        EitherT(CF().racePair(fa.fix().value, fb.fix().value).flatMap {
+            when (it) {
+                is Either.Left -> {
+                    val value = it.a.a
+                    val fiberB = it.a.b
+                    when (value) {
+                        is Either.Left -> fiberB.cancel().map { _ -> value as Either.Left<L> }
+                        is Either.Right -> CF().just(Right(Left(Tuple2(value.b, fiberT(fiberB)))))
+                    }
+                }
+                is Either.Right -> {
+                    val fiberA = it.b.a
+                    val value = it.b.b
+                    when (value) {
+                        is Either.Left -> fiberA.cancel().map { _ -> value as Either.Left<L> }
+                        is Either.Right -> CF().just(Right(Right(Tuple2(fiberT(fiberA), value.b))))
+                    }
+                }
+            }
+        })
+    }
+
+    fun <A> fiberT(fiber: Fiber<F, Either<L, A>>): Fiber<EitherTPartialOf<F, L>, A> = CF().run {
+        Fiber(EitherT(fiber.join()), EitherT(fiber.cancel().map { it.right() }))
+    }
+}
+
+@instance(Concurrent::class)
+interface OptionTConcurrent<F> : Concurrent<OptionTPartialOf<F>> {
+
+    fun CF(): Concurrent<F>
+
+    override fun <A> cancelable(k: ((Either<Throwable, A>) -> Unit) -> CancelToken<OptionTPartialOf<F>>): Kind<OptionTPartialOf<F>, A> = CF().run {
+        OptionT(CF().cancelable(k.andThen { token -> token.fix().value.map { Unit } }).map { it.some() })
+    }
+
+    override fun <A> start(fa: Kind<OptionTPartialOf<F>, A>): Kind<OptionTPartialOf<F>, Fiber<OptionTPartialOf<F>, A>> = CF().run {
+        OptionT(CF().start(fa.fix().value).map { fiberT(it) }.map { it.some() })
+    }
+
+    override fun <A, B> racePair(fa: Kind<OptionTPartialOf<F>, A>, fb: Kind<OptionTPartialOf<F>, B>): Kind<OptionTPartialOf<F>, Either<Tuple2<A, Fiber<OptionTPartialOf<F>, B>>, Tuple2<Fiber<OptionTPartialOf<F>, A>, B>>> = CF().run {
+        OptionT(CF().racePair(fa.fix().value, fb.fix().value).flatMap {
+            when (it) {
+                is Either.Left -> {
+                    val value = it.a.a
+                    val fiberB = it.a.b
+                    when (value) {
+                        is None -> fiberB.cancel().map { _ -> None }
+                        is Some -> CF().just(Some(Left(Tuple2(value.t, fiberT(fiberB)))))
+                    }
+                }
+                is Either.Right -> {
+                    val fiberA = it.b.a
+                    val value = it.b.b
+                    when (value) {
+                        is None -> fiberA.cancel().map { _ -> None }
+                        is Some -> CF().just(Some(Right(Tuple2(fiberT(fiberA), value.t))))
+                    }
+                }
+            }
+        })
+    }
+
+    fun <A> fiberT(fiber: Fiber<F, Option<A>>): Fiber<OptionTPartialOf<F>, A> = CF().run {
+        Fiber(OptionT(fiber.join()), OptionT(fiber.cancel().map { it.some() }))
+    }
+}
+
+@instance(Concurrent::class)
+interface WriterTConcurrent<F, L> : Concurrent<WriterTPartialOf<F, L>> {
+
+    fun CF(): Concurrent<F>
+
+    fun ML(): Monoid<L>
+
+    override fun <A> cancelable(k: ((Either<Throwable, A>) -> Unit) -> CancelToken<WriterTPartialOf<F, L>>): Kind<WriterTPartialOf<F, L>, A> = CF().run {
+        WriterT(CF().cancelable(k.andThen { it.fix().value.map { _ -> Unit } }).map { v -> Tuple2(ML().empty(), v) })
+    }
+
+    override fun <A> start(fa: Kind<WriterTPartialOf<F, L>, A>): Kind<WriterTPartialOf<F, L>, Fiber<WriterTPartialOf<F, L>, A>> = CF().run {
+        WriterT(CF().start(fa.fix().value).map { fiber ->
+            Tuple2(ML().empty(), fiberT(fiber))
+        })
+    }
+
+    override fun <A, B> racePair(fa: Kind<WriterTPartialOf<F, L>, A>, fb: Kind<WriterTPartialOf<F, L>, B>): Kind<WriterTPartialOf<F, L>, Either<Tuple2<A, Fiber<WriterTPartialOf<F, L>, B>>, Tuple2<Fiber<WriterTPartialOf<F, L>, A>, B>>> = CF().run {
+        WriterT(CF().racePair(fa.fix().value, fb.fix().value).map {
+            when (it) {
+                is Either.Left -> {
+                    val l = it.a.a.a
+                    val value = it.a.a.b
+                    val fiber = it.a.b
+                    Tuple2(l, Left(Tuple2(value, fiberT(fiber))))
+                }
+                is Either.Right -> {
+                    val fiber = it.b.a
+                    val l = it.b.b.a
+                    val value = it.b.b.b
+                    Tuple2(l, Right(Tuple2(fiberT(fiber), value)))
+                }
+            }
+        })
+    }
+
+    fun <A> fiberT(fiber: Fiber<F, Tuple2<L, A>>): Fiber<WriterTPartialOf<F, L>, A> = CF().run {
+        Fiber(WriterT(fiber.join()), WriterT(fiber.cancel().map { v -> Tuple2(ML().empty(), v) }))
+    }
+}
+
+@instance(Concurrent::class)
+interface KleisliConcurrent<F, R> : Concurrent<KleisliPartialOf<F, R>> {
+
+    fun CF(): Concurrent<F>
+
+    override fun <A> cancelable(k: ((Either<Throwable, A>) -> Unit) -> CancelToken<KleisliPartialOf<F, R>>): Kind<KleisliPartialOf<F, R>, A> = CF().run {
+        Kleisli { r -> CF().cancelable(k.andThen { it.fix().run(r).map { _ -> Unit } }) }
+    }
+
+    override fun <A> start(fa: Kind<KleisliPartialOf<F, R>, A>): Kind<KleisliPartialOf<F, R>, Fiber<KleisliPartialOf<F, R>, A>> = CF().run {
+        Kleisli { r -> CF().start(fa.fix().run(r)).map { fiberT(it) } }
+    }
+
+    override fun <A, B> racePair(fa: Kind<KleisliPartialOf<F, R>, A>, fb: Kind<KleisliPartialOf<F, R>, B>): Kind<KleisliPartialOf<F, R>, Either<Tuple2<A, Fiber<KleisliPartialOf<F, R>, B>>, Tuple2<Fiber<KleisliPartialOf<F, R>, A>, B>>> = CF().run {
+        Kleisli { r ->
+            CF().racePair(fa.fix().run(r), fb.fix().run(r)).map {
+                when (it) {
+                    is Either.Left -> {
+                        val a = it.a.a
+                        val fiber = it.a.b
+                        Left(Tuple2(a, fiberT(fiber)))
+                    }
+                    is Either.Right -> {
+                        val fiber = it.b.a
+                        val b = it.b.b
+                        Right(Tuple2(fiberT(fiber), b))
+                    }
+                }
             }
         }
     }
+
+    fun <A> fiberT(fiber: Fiber<F, A>): Fiber<KleisliPartialOf<F, R>, A> =
+        Fiber(Kleisli { fiber.join() }, Kleisli { fiber.cancel() })
 }
-*/
