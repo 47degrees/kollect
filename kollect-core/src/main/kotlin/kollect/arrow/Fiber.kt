@@ -71,14 +71,14 @@ interface FiberApplicative<F> : Applicative<FiberPartialOf<F>> {
     override fun <A, B, Z> Kind<FiberPartialOf<F>, A>.map2(fb: Kind<FiberPartialOf<F>, B>, f: (Tuple2<A, B>) -> Z): Fiber<F, Z> = CF().run {
         val fa2 = this@map2.fix().join().guaranteeCase {
             when (it) {
-                is ExitCase.Failing -> fb.fix().cancel()
+                is ExitCase.Error -> fb.fix().cancel()
                 else -> CF().just(Unit)
             }
         }
 
         val fb2 = fb.fix().join().guaranteeCase {
             when (it) {
-                is ExitCase.Failing -> this@map2.fix().cancel()
+                is ExitCase.Error -> this@map2.fix().cancel()
                 else -> CF().just(Unit)
             }
         }

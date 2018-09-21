@@ -6,6 +6,7 @@ dependencies {
     compile "io.arrow-kt:arrow-instances-core:$arrowVersion"
     compile "io.arrow-kt:arrow-instances-data:$arrowVersion"
     compile "io.arrow-kt:arrow-typeclasses:$arrowVersion"
+    compile "io.arrow-kt:arrow-mtl:$arrowVersion"
     compile "io.arrow-kt:arrow-data:$arrowVersion"
     compile "io.arrow-kt:arrow-generic:$arrowVersion"
 
