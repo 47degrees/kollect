@@ -27,10 +27,13 @@ import arrow.data.fix
 import arrow.effects.deferred.Deferred
 import arrow.effects.typeclasses.Async
 import arrow.instance
-import arrow.typeclasses.Monoid
 import kollect.arrow.Bracket
+import kollect.arrow.EitherTAsync
 import kollect.arrow.ExitCase
+import kollect.arrow.KleisliAsync
+import kollect.arrow.OptionTAsync
 import kollect.arrow.TrampolineEC.Companion.immediate
+import kollect.arrow.WriterTAsync
 import kollect.arrow.concurrent.FiniteDuration
 import kollect.arrow.concurrent.Ref
 import kollect.arrow.effects.Timer
@@ -237,7 +240,7 @@ interface Concurrent<F> : Async<F>, Bracket<F, Throwable> {
 }
 
 @instance(Concurrent::class)
-interface EitherTConcurrent<F, L> : Concurrent<EitherTPartialOf<F, L>> {
+interface EitherTConcurrent<F, L> : Concurrent<EitherTPartialOf<F, L>>, EitherTAsync<F, L> {
     fun CF(): Concurrent<F>
 
     override fun <A> cancelable(k: ((Either<Throwable, A>) -> Unit) -> CancelToken<EitherTPartialOf<F, L>>): Kind<EitherTPartialOf<F, L>, A> = CF().run {
@@ -277,7 +280,7 @@ interface EitherTConcurrent<F, L> : Concurrent<EitherTPartialOf<F, L>> {
 }
 
 @instance(Concurrent::class)
-interface OptionTConcurrent<F> : Concurrent<OptionTPartialOf<F>> {
+interface OptionTConcurrent<F> : Concurrent<OptionTPartialOf<F>>, OptionTAsync<F> {
 
     fun CF(): Concurrent<F>
 
@@ -318,11 +321,9 @@ interface OptionTConcurrent<F> : Concurrent<OptionTPartialOf<F>> {
 }
 
 @instance(Concurrent::class)
-interface WriterTConcurrent<F, L> : Concurrent<WriterTPartialOf<F, L>> {
+interface WriterTConcurrent<F, L> : Concurrent<WriterTPartialOf<F, L>>, WriterTAsync<F, L> {
 
     fun CF(): Concurrent<F>
-
-    fun ML(): Monoid<L>
 
     override fun <A> cancelable(k: ((Either<Throwable, A>) -> Unit) -> CancelToken<WriterTPartialOf<F, L>>): Kind<WriterTPartialOf<F, L>, A> = CF().run {
         WriterT(CF().cancelable(k.andThen { it.fix().value.map { _ -> Unit } }).map { v -> Tuple2(ML().empty(), v) })
@@ -359,7 +360,7 @@ interface WriterTConcurrent<F, L> : Concurrent<WriterTPartialOf<F, L>> {
 }
 
 @instance(Concurrent::class)
-interface KleisliConcurrent<F, R> : Concurrent<KleisliPartialOf<F, R>> {
+interface KleisliConcurrent<F, R> : Concurrent<KleisliPartialOf<F, R>>, KleisliAsync<F, R> {
 
     fun CF(): Concurrent<F>
 
