@@ -16,11 +16,11 @@ sealed class ExitCase<out E> {
 
     object Cancelled : ExitCase<Nothing>()
 
-    data class Failing<E>(val e: E) : ExitCase<E>()
+    data class Failing<out E>(val e: E) : ExitCase<E>()
 }
 
 fun <E> Either<E, *>.toExitCase() =
-    fold(::Failing, { ExitCase.Completed })
+    fold(::Failing) { ExitCase.Completed }
 
 interface Bracket<F, E> : MonadError<F, E> {
 

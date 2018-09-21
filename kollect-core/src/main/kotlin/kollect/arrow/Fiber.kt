@@ -1,40 +1,21 @@
+@file:Suppress("FunctionName")
+
 package arrow.effects
 
 import arrow.Kind
+import arrow.core.Either
+import arrow.core.Tuple2
 import arrow.higherkind
 import arrow.instance
 import arrow.typeclasses.Applicative
+import kollect.arrow.ExitCase
 
 typealias CancelToken<F> = arrow.Kind<F, Unit>
 
 /**
- * `Fiber` represents the (pure) result of an [[Async]] data type (e.g. [[IO]]) being started concurrently and that can
- * be either joined or canceled. You can think of fibers as being lightweight threads, a fiber being a concurrency
+ * Fiber represents the (pure) result of an Async data type (e.g. [[IO]]) being started concurrently and that can be
+ * either joined or canceled. You can think of fibers as being lightweight threads, a fiber being a concurrency
  * primitive for doing cooperative multi-tasking.
- *
- * For example a `Fiber` value is the result of evaluating [[IO.start]]:
- *
- * {{{
- *   val io = IO.shift *> IO(println("Hello!"))
- *
- *   val fiber: IO[Fiber[IO, Unit]] = io.start
- * }}}
- *
- * Usage example:
- *
- * {{{
- *   for {
- *     fiber <- IO.shift *> launchMissiles.start
- *     _ <- runToBunker.handleErrorWith { error =>
- *       // Retreat failed, cancel launch (maybe we should
- *       // have retreated to our bunker before the launch?)
- *       fiber.cancel *> IO.raiseError(error)
- *     }
- *     aftermath <- fiber.join
- *   } yield {
- *     aftermath
- *   }
- * }}}
  */
 @higherkind
 abstract class Fiber<F, A> : FiberOf<F, A> {
@@ -80,39 +61,58 @@ interface FiberApplicative<F> : Applicative<FiberPartialOf<F>> {
 
     fun CF(): Concurrent<F>
 
-    override fun <A> just(a: A): Kind<FiberPartialOf<F>, A> = Fiber(CF.just(a), CF.unit())
-}
-/*
-private abstract class FiberInstances {
+    override fun <A> just(a: A): Fiber<F, A> = Fiber(CF().just(a), CF().just(Unit))
 
-    fun <F> fiberApplicative(CF: Concurrent<F>): Applicative<FiberKindPartial<F>> = object : Applicative<FiberKindPartial<F>> {
-        final override def pure [A](x: A): Fiber[F, A] =
-        Fiber(F.pure(x), F.unit)
-
-        final override def ap [A, B](ff: Fiber[ F, A => B])(fa: Fiber[F, A]): Fiber[F, B] =
-        map2(ff, fa)(_(_))
-        final override def map2 [A, B, Z](fa: Fiber[ F, A], fb: Fiber[F, B])(f: (A, B) => Z): Fiber[F, Z] =
-        {
-            val fa2 = F.guaranteeCase(fa.join) { case ExitCase . Error (_) => fb.cancel; case _ => F . unit }
-            val fb2 = F.guaranteeCase(fb.join) { case ExitCase . Error (_) => fa.cancel; case _ => F . unit }
-            Fiber(
-                F.racePair(fa2, fb2).flatMap {
-                    case Left ((a, fiberB)) => (a.pure[F], fiberB.join).mapN(f)
-                    case Right ((fiberA, b)) => (fiberA.join, b.pure[F]).mapN(f)
-                },
-                F.map2(fa.cancel, fb.cancel)((_, _) =>()))
+    override fun <A, B> Kind<FiberPartialOf<F>, A>.ap(ff: Kind<FiberPartialOf<F>, (A) -> B>): Fiber<F, B> =
+        this.map2(ff) { tuple: Tuple2<A, (A) -> B> ->
+            tuple.b(tuple.a)
         }
-        final override def product [A, B](fa: Fiber[ F, A], fb: Fiber[F, B]): Fiber[F, (A, B)] =
-        map2(fa, fb)((_, _))
-        final override def map [A, B](fa: Fiber[ F, A])(f: A => B): Fiber[F, B] =
-        Fiber(F.map(fa.join)(f), fa.cancel)
-        final override val unit: Fiber[F, Unit] =
-        Fiber(F.unit, F.unit)
+
+    override fun <A, B, Z> Kind<FiberPartialOf<F>, A>.map2(fb: Kind<FiberPartialOf<F>, B>, f: (Tuple2<A, B>) -> Z): Fiber<F, Z> = CF().run {
+        val fa2 = this@map2.fix().join().guaranteeCase {
+            when (it) {
+                is ExitCase.Failing -> fb.fix().cancel()
+                else -> CF().just(Unit)
+            }
+        }
+
+        val fb2 = fb.fix().join().guaranteeCase {
+            when (it) {
+                is ExitCase.Failing -> this@map2.fix().cancel()
+                else -> CF().just(Unit)
+            }
+        }
+
+        Fiber(CF().racePair(fa2, fb2).flatMap {
+            when (it) {
+                is Either.Left -> {
+                    val a = it.a.a
+                    val fiberB = it.a.b
+                    Tuple2(a.just(), fiberB.join()).mapN(CF(), f)
+                }
+                is Either.Right -> {
+                    val fiberA = it.b.a
+                    val b = it.b.b
+                    Tuple2(fiberA.join(), b.just()).mapN(CF(), f)
+                }
+            }
+        }, this@map2.fix().cancel().map2(fb.fix().cancel()) { Unit })
     }
 
-    implicit def fiberMonoid[F[_]: Concurrent, M[_], A: Monoid]: Monoid[Fiber[F, A]] =
-    Applicative.monoid[Fiber[F, ?], A]
+    override fun <A, B> Kind<FiberPartialOf<F>, A>.product(fb: Kind<FiberPartialOf<F>, B>): Fiber<F, Tuple2<A, B>> =
+        this.map2(fb) { it }.fix()
+
+    override fun <A, B> Kind<FiberPartialOf<F>, A>.map(f: (A) -> B): Fiber<F, B> = CF().run {
+        Fiber(this@map.fix().join().map(f), this@map.fix().cancel())
+    }
+
+    fun unit(): Fiber<F, Unit> = Fiber(CF().just(Unit), CF().just(Unit))
 }
 
-*/
-
+fun <F, A0, A1, Z> Tuple2<Kind<F, A0>, Kind<F, A1>>.mapN(AF: Applicative<F>, f: (Tuple2<A0, A1>) -> Z): Kind<F, Z> = AF.run {
+    val f0 = this@mapN.a
+    val f1 = this@mapN.b
+    return f0.product(f1).map { tuple: Tuple2<A0, A1> ->
+        f(tuple)
+    }
+}
