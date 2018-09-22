@@ -1,4 +1,4 @@
-package kollect.arrow.effects
+package kollect.arrow.typeclass
 
 import arrow.Kind
 import arrow.core.Tuple2

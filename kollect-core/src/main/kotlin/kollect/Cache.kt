@@ -7,10 +7,10 @@ import arrow.core.toOption
 import arrow.data.ListK
 import arrow.data.foldable
 import arrow.data.k
-import arrow.effects.Concurrent
 import arrow.instance
 import arrow.typeclasses.Monoid
 import kollect.arrow.foldLeftM
+import kollect.arrow.typeclass.Concurrent
 
 class DataSourceName(val name: String) : Any()
 class DataSourceId(val id: Any) : Any()

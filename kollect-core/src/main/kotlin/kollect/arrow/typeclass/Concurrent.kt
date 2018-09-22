@@ -1,6 +1,6 @@
 @file:Suppress("FunctionName")
 
-package arrow.effects
+package kollect.arrow.typeclass
 
 import arrow.Kind
 import arrow.concurrent.Promise
@@ -24,19 +24,18 @@ import arrow.data.OptionTPartialOf
 import arrow.data.WriterT
 import arrow.data.WriterTPartialOf
 import arrow.data.fix
+import arrow.effects.CancelToken
+import arrow.effects.Fiber
 import arrow.effects.deferred.Deferred
 import arrow.effects.typeclasses.Async
 import arrow.instance
-import kollect.arrow.Bracket
 import kollect.arrow.EitherTAsync
-import kollect.arrow.ExitCase
 import kollect.arrow.KleisliAsync
 import kollect.arrow.OptionTAsync
 import kollect.arrow.TrampolineEC.Companion.immediate
 import kollect.arrow.WriterTAsync
 import kollect.arrow.concurrent.FiniteDuration
 import kollect.arrow.concurrent.Ref
-import kollect.arrow.effects.Timer
 import java.util.concurrent.TimeoutException
 
 /**

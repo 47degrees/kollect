@@ -8,11 +8,11 @@ import arrow.core.Some
 import arrow.core.Tuple2
 import arrow.data.ForNonEmptyList
 import arrow.data.NonEmptyList
-import arrow.effects.Concurrent
 import arrow.typeclasses.Traverse
 import kollect.arrow.Par
-import kollect.arrow.Parallel.Companion.parTraverse
 import kollect.arrow.collect
+import kollect.arrow.typeclass.Concurrent
+import kollect.arrow.typeclass.Parallel.Companion.parTraverse
 
 sealed class BatchExecution
 object Sequentially : BatchExecution()

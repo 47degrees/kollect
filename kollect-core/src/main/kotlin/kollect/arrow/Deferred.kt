@@ -10,12 +10,12 @@ import arrow.core.Option
 import arrow.core.Right
 import arrow.core.Success
 import arrow.core.some
-import arrow.effects.Concurrent
 import arrow.effects.deferred.Deferred.Companion.Id
 import arrow.effects.typeclasses.Async
 import arrow.higherkind
 import kollect.arrow.ExecutionContext
 import kollect.arrow.TrampolineEC
+import kollect.arrow.typeclass.Concurrent
 import java.util.concurrent.atomic.AtomicReference
 
 /**

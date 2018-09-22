@@ -1,5 +1,7 @@
 package kollect.arrow
 
+import kollect.arrow.typeclass.Parallel
+
 interface Par<F, G> {
 
     fun parallel(): Parallel<F, G>

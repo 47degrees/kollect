@@ -1,4 +1,4 @@
-package kollect.arrow
+package kollect.arrow.typeclass
 
 import arrow.Kind
 import arrow.core.Right
@@ -21,6 +21,7 @@ import arrow.typeclasses.Applicative
 import arrow.typeclasses.Functor
 import arrow.typeclasses.Monad
 import arrow.typeclasses.Monoid
+import kollect.arrow.ExecutionContext
 
 interface ContextShift<F> {
 
@@ -47,6 +48,9 @@ interface ContextShift<F> {
      * @param fa  Computation to evaluate using `ec`
      */
     fun <A> evalOn(ec: ExecutionContext, fa: arrow.Kind<F, A>): arrow.Kind<F, A>
+
+    companion object {
+    }
 }
 
 @instance(ContextShift::class)

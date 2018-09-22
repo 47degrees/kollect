@@ -1,6 +1,6 @@
 @file:Suppress("FunctionName")
 
-package kollect.arrow
+package kollect.arrow.typeclass
 
 import arrow.Kind
 import arrow.core.Either
@@ -10,7 +10,7 @@ import arrow.data.fix
 import arrow.instance
 import arrow.instances.KleisliMonadErrorInstance
 import arrow.typeclasses.MonadError
-import kollect.arrow.ExitCase.Error
+import kollect.arrow.typeclass.ExitCase.Error
 
 sealed class ExitCase<out E> {
 
@@ -39,6 +39,8 @@ interface Bracket<F, E> : MonadError<F, E> {
 
     fun <A> Kind<F, A>.guaranteeCase(finalizer: (ExitCase<E>) -> Kind<F, Unit>): Kind<F, A> =
         bracketCase({ _, e -> finalizer(e) }, { _ -> this })
+
+    companion object
 }
 
 @instance(Bracket::class)

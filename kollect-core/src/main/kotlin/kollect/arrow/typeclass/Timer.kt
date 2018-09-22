@@ -1,4 +1,4 @@
-package kollect.arrow.effects
+package kollect.arrow.typeclass
 
 import arrow.core.Tuple2
 import arrow.core.right
@@ -69,6 +69,8 @@ interface Timer<F> {
      * equal to zero.
      */
     fun sleep(duration: FiniteDuration): arrow.Kind<F, Unit>
+
+    companion object
 }
 
 @instance(Timer::class)

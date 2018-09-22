@@ -8,7 +8,8 @@ import arrow.core.Tuple2
 import arrow.higherkind
 import arrow.instance
 import arrow.typeclasses.Applicative
-import kollect.arrow.ExitCase
+import kollect.arrow.typeclass.Concurrent
+import kollect.arrow.typeclass.ExitCase
 
 typealias CancelToken<F> = arrow.Kind<F, Unit>
 

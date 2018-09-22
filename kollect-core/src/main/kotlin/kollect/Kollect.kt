@@ -10,18 +10,18 @@ import arrow.core.Some
 import arrow.core.Tuple2
 import arrow.data.ForNonEmptyList
 import arrow.data.NonEmptyList
-import arrow.effects.Concurrent
 import arrow.effects.deferred.Deferred
 import arrow.higherkind
 import arrow.typeclasses.Applicative
 import arrow.typeclasses.Traverse
 import arrow.typeclasses.binding
-import kollect.arrow.ContextShift
+import kollect.arrow.typeclass.ContextShift
 import kollect.arrow.Par
-import kollect.arrow.Parallel.Companion.parTraverse
+import kollect.arrow.typeclass.Parallel.Companion.parTraverse
 import kollect.arrow.collect
 import kollect.arrow.concurrent.Ref
-import kollect.arrow.effects.Timer
+import kollect.arrow.typeclass.Concurrent
+import kollect.arrow.typeclass.Timer
 import java.util.concurrent.TimeUnit
 
 // Kollect data type

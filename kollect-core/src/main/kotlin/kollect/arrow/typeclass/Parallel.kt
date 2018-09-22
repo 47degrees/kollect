@@ -1,4 +1,4 @@
-package kollect.arrow
+package kollect.arrow.typeclass
 
 import arrow.Kind
 import arrow.core.Eval
