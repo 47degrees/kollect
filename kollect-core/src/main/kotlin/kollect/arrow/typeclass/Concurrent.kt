@@ -29,11 +29,11 @@ import arrow.effects.Fiber
 import arrow.effects.deferred.Deferred
 import arrow.effects.typeclasses.Async
 import arrow.instance
-import kollect.arrow.EitherTAsync
-import kollect.arrow.KleisliAsync
-import kollect.arrow.OptionTAsync
+import kollect.arrow.instances.EitherTAsync
+import kollect.arrow.instances.KleisliAsync
+import kollect.arrow.instances.OptionTAsync
 import kollect.arrow.TrampolineEC.Companion.immediate
-import kollect.arrow.WriterTAsync
+import kollect.arrow.instances.WriterTAsync
 import kollect.arrow.concurrent.FiniteDuration
 import kollect.arrow.concurrent.Ref
 import java.util.concurrent.TimeoutException

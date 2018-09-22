@@ -1,6 +1,6 @@
 @file:Suppress("FunctionName")
 
-package kollect.arrow
+package kollect.arrow.instances
 
 import arrow.Kind
 import arrow.core.Tuple2
