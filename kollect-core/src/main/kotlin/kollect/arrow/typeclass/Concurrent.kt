@@ -238,7 +238,7 @@ interface Concurrent<F> : Async<F>, Bracket<F, Throwable> {
     }
 }
 
-@instance(Concurrent::class)
+@instance(EitherT::class)
 interface EitherTConcurrent<F, L> : Concurrent<EitherTPartialOf<F, L>>, EitherTAsync<F, L> {
     fun CF(): Concurrent<F>
 
@@ -278,7 +278,7 @@ interface EitherTConcurrent<F, L> : Concurrent<EitherTPartialOf<F, L>>, EitherTA
     }
 }
 
-@instance(Concurrent::class)
+@instance(OptionT::class)
 interface OptionTConcurrent<F> : Concurrent<OptionTPartialOf<F>>, OptionTAsync<F> {
 
     fun CF(): Concurrent<F>
@@ -319,7 +319,7 @@ interface OptionTConcurrent<F> : Concurrent<OptionTPartialOf<F>>, OptionTAsync<F
     }
 }
 
-@instance(Concurrent::class)
+@instance(WriterT::class)
 interface WriterTConcurrent<F, L> : Concurrent<WriterTPartialOf<F, L>>, WriterTAsync<F, L> {
 
     fun CF(): Concurrent<F>
@@ -358,7 +358,7 @@ interface WriterTConcurrent<F, L> : Concurrent<WriterTPartialOf<F, L>>, WriterTA
     }
 }
 
-@instance(Concurrent::class)
+@instance(Kleisli::class)
 interface KleisliConcurrent<F, R> : Concurrent<KleisliPartialOf<F, R>>, KleisliAsync<F, R> {
 
     fun CF(): Concurrent<F>

@@ -140,7 +140,7 @@ interface Clock<F> {
     }
 }
 
-@instance(Clock::class)
+@instance(EitherT::class)
 interface EitherTClock<F, L> : Clock<EitherTPartialOf<F, L>> {
     fun FF(): Functor<F>
 
@@ -155,7 +155,7 @@ interface EitherTClock<F, L> : Clock<EitherTPartialOf<F, L>> {
     }
 }
 
-@instance(Clock::class)
+@instance(OptionT::class)
 interface OptionTClock<F> : Clock<OptionTPartialOf<F>> {
     fun FF(): Functor<F>
 
@@ -170,7 +170,7 @@ interface OptionTClock<F> : Clock<OptionTPartialOf<F>> {
     }
 }
 
-@instance(Clock::class)
+@instance(StateT::class)
 interface StateTClock<F, S> : Clock<StateTPartialOf<F, S>> {
 
     fun MF(): Monad<F>
@@ -182,7 +182,7 @@ interface StateTClock<F, S> : Clock<StateTPartialOf<F, S>> {
     override fun monotonic(unit: TimeUnit): StateT<F, S, Long> = StateT.lift(MF(), clock().monotonic(unit))
 }
 
-@instance(Clock::class)
+@instance(WriterT::class)
 interface WriterTClock<F, L> : Clock<WriterTPartialOf<F, L>> {
 
     fun AF(): Applicative<F>
@@ -200,7 +200,7 @@ interface WriterTClock<F, L> : Clock<WriterTPartialOf<F, L>> {
     }
 }
 
-@instance(Clock::class)
+@instance(Kleisli::class)
 interface KleisliClock<F, R> : Clock<KleisliPartialOf<F, R>> {
 
     fun clock(): Clock<F>

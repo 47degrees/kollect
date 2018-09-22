@@ -53,7 +53,7 @@ interface ContextShift<F> {
     }
 }
 
-@instance(ContextShift::class)
+@instance(EitherT::class)
 interface EitherTContextShift<F, L> : ContextShift<EitherTPartialOf<F, L>> {
 
     fun FF(): Functor<F>
@@ -68,7 +68,7 @@ interface EitherTContextShift<F, L> : ContextShift<EitherTPartialOf<F, L>> {
         EitherT(CS().evalOn(ec, fa.value()))
 }
 
-@instance(ContextShift::class)
+@instance(OptionT::class)
 interface OptionTContextShift<F> : ContextShift<OptionTPartialOf<F>> {
 
     fun FF(): Functor<F>
@@ -83,7 +83,7 @@ interface OptionTContextShift<F> : ContextShift<OptionTPartialOf<F>> {
         OptionT(CS().evalOn(ec, fa.value()))
 }
 
-@instance(ContextShift::class)
+@instance(WriterT::class)
 interface WriterTContextShift<F, L> : ContextShift<WriterTPartialOf<F, L>> {
     fun AF(): Applicative<F>
 
@@ -99,7 +99,7 @@ interface WriterTContextShift<F, L> : ContextShift<WriterTPartialOf<F, L>> {
         WriterT(CS().evalOn(ec, fa.value()))
 }
 
-@instance(ContextShift::class)
+@instance(StateT::class)
 interface StateTContextShift<F, L> : ContextShift<StateTPartialOf<F, L>> {
 
     fun MF(): Monad<F>
@@ -114,7 +114,7 @@ interface StateTContextShift<F, L> : ContextShift<StateTPartialOf<F, L>> {
         StateT.invoke(MF()) { s -> CS().evalOn(ec, fa.fix().run(MF(), s)) }
 }
 
-@instance(ContextShift::class)
+@instance(Kleisli::class)
 interface KleisliContextShift<F, R> : ContextShift<KleisliPartialOf<F, R>> {
 
     fun CS(): ContextShift<F>

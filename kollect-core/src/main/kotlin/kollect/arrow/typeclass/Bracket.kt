@@ -43,7 +43,7 @@ interface Bracket<F, E> : MonadError<F, E> {
     companion object
 }
 
-@instance(Bracket::class)
+@instance(Kleisli::class)
 interface KleisliBracket<F, R, E> : Bracket<KleisliPartialOf<F, R>, E> {
 
     fun BFE(): Bracket<F, E>

@@ -73,7 +73,7 @@ interface Timer<F> {
     companion object
 }
 
-@instance(Timer::class)
+@instance(EitherT::class)
 interface EitherTTimer<F, L> : Timer<EitherTPartialOf<F, L>> {
     fun FF(): Functor<F>
 
@@ -92,7 +92,7 @@ interface EitherTTimer<F, L> : Timer<EitherTPartialOf<F, L>> {
     }
 }
 
-@instance(Timer::class)
+@instance(OptionT::class)
 interface OptionTTimer<F> : Timer<OptionTPartialOf<F>> {
     fun FF(): Functor<F>
 
@@ -111,7 +111,7 @@ interface OptionTTimer<F> : Timer<OptionTPartialOf<F>> {
     }
 }
 
-@instance(Timer::class)
+@instance(WriterT::class)
 interface WriterTTimer<F, L> : Timer<WriterTPartialOf<F, L>> {
 
     fun AF(): Applicative<F>
@@ -135,7 +135,7 @@ interface WriterTTimer<F, L> : Timer<WriterTPartialOf<F, L>> {
     }
 }
 
-@instance(Timer::class)
+@instance(StateT::class)
 interface StateTTimer<F, S> : Timer<StateTPartialOf<F, S>> {
 
     fun MF(): Monad<F>
@@ -153,7 +153,7 @@ interface StateTTimer<F, S> : Timer<StateTPartialOf<F, S>> {
     override fun sleep(duration: FiniteDuration): StateT<F, S, Unit> = StateT.lift(MF(), TF().sleep(duration))
 }
 
-@instance(Timer::class)
+@instance(Kleisli::class)
 interface KleisliTimer<F, R> : Timer<KleisliPartialOf<F, R>> {
 
     fun TF(): Timer<F>

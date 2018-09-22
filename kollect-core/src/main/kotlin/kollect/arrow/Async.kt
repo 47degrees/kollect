@@ -22,7 +22,7 @@ import arrow.typeclasses.Monoid
 
 // Async instances
 
-@instance(Async::class)
+@instance(EitherT::class)
 interface EitherTAsync<F, L> : Async<EitherTPartialOf<F, L>> {
 
     fun AF(): Async<F>
@@ -32,7 +32,7 @@ interface EitherTAsync<F, L> : Async<EitherTPartialOf<F, L>> {
     }
 }
 
-@instance(Async::class)
+@instance(OptionT::class)
 interface OptionTAsync<F> : Async<OptionTPartialOf<F>> {
 
     fun AF(): Async<F>
@@ -42,7 +42,7 @@ interface OptionTAsync<F> : Async<OptionTPartialOf<F>> {
     }
 }
 
-@instance(Async::class)
+@instance(WriterT::class)
 interface WriterTAsync<F, L> : Async<WriterTPartialOf<F, L>> {
 
     fun AF(): Async<F>
@@ -54,7 +54,7 @@ interface WriterTAsync<F, L> : Async<WriterTPartialOf<F, L>> {
     }
 }
 
-@instance(Async::class)
+@instance(Kleisli::class)
 interface KleisliAsync<F, R> : Async<KleisliPartialOf<F, R>> {
 
     fun AF(): Async<F>
