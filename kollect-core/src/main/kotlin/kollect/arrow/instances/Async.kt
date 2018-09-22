@@ -19,46 +19,45 @@ import arrow.effects.typeclasses.Proc
 import arrow.instance
 import arrow.typeclasses.Monoid
 
-
 // Async instances
 
 @instance(EitherT::class)
-interface EitherTAsync<F, L> : Async<EitherTPartialOf<F, L>> {
+interface EitherTAsync<F, L> : Async<EitherTPartialOf<F, L>>, EitherTMonadDefer<F, L> {
 
-    fun AF(): Async<F>
+    override fun MF(): Async<F>
 
-    override fun <A> async(fa: Proc<A>): Kind<EitherTPartialOf<F, L>, A> = AF().run {
-        EitherT(AF().async(fa).map { it.right() })
+    override fun <A> async(fa: Proc<A>): Kind<EitherTPartialOf<F, L>, A> = MF().run {
+        EitherT(MF().async(fa).map { it.right() })
     }
 }
 
 @instance(OptionT::class)
-interface OptionTAsync<F> : Async<OptionTPartialOf<F>> {
+interface OptionTAsync<F> : Async<OptionTPartialOf<F>>, OptionTMonadDefer<F> {
 
-    fun AF(): Async<F>
+    override fun MF(): Async<F>
 
-    override fun <A> async(fa: Proc<A>): Kind<OptionTPartialOf<F>, A> = AF().run {
-        OptionT(AF().async(fa).map { it.some() })
+    override fun <A> async(fa: Proc<A>): Kind<OptionTPartialOf<F>, A> = MF().run {
+        OptionT(MF().async(fa).map { it.some() })
     }
 }
 
 @instance(WriterT::class)
-interface WriterTAsync<F, L> : Async<WriterTPartialOf<F, L>> {
+interface WriterTAsync<F, L> : Async<WriterTPartialOf<F, L>>, WriterTMonadDefer<F, L> {
 
-    fun AF(): Async<F>
+    override fun MF(): Async<F>
 
-    fun ML(): Monoid<L>
+    override fun ML(): Monoid<L>
 
-    override fun <A> async(fa: Proc<A>): Kind<WriterTPartialOf<F, L>, A> = AF().run {
-        WriterT(AF().async(fa).map { v -> Tuple2(ML().empty(), v) })
+    override fun <A> async(fa: Proc<A>): Kind<WriterTPartialOf<F, L>, A> = MF().run {
+        WriterT(MF().async(fa).map { v -> Tuple2(ML().empty(), v) })
     }
 }
 
 @instance(Kleisli::class)
-interface KleisliAsync<F, R> : Async<KleisliPartialOf<F, R>> {
+interface KleisliAsync<F, R> : Async<KleisliPartialOf<F, R>>, KleisliMonadDefer<F, R> {
 
-    fun AF(): Async<F>
+    override fun MF(): Async<F>
 
     override fun <A> async(fa: Proc<A>): Kind<KleisliPartialOf<F, R>, A> =
-        Kleisli { AF().async(fa) }
+        Kleisli { MF().async(fa) }
 }
