@@ -186,7 +186,6 @@ interface WriterTMonadDefer<F, L> : MonadDefer<WriterTPartialOf<F, L>> {
 
 @instance(WriterT::class)
 interface WriterTMonadError<F, L, E> : MonadError<WriterTPartialOf<F, L>, E>, WriterTMonadInstance<F, L>, WriterTApplicativeError<F, L, E> {
-    override fun FF(): MonadError<F, E>
 }
 
 @instance(WriterT::class)
