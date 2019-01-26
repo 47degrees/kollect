@@ -3,22 +3,12 @@ package kollect.arrow.typeclass
 import arrow.core.Tuple2
 import arrow.core.right
 import arrow.core.some
-import arrow.data.EitherT
-import arrow.data.EitherTPartialOf
-import arrow.data.Kleisli
-import arrow.data.KleisliPartialOf
-import arrow.data.OptionT
-import arrow.data.OptionTPartialOf
-import arrow.data.StateT
-import arrow.data.StateTPartialOf
-import arrow.data.WriterT
-import arrow.data.WriterTPartialOf
-import arrow.instance
+import arrow.data.*
+import arrow.extension
 import arrow.typeclasses.Applicative
 import arrow.typeclasses.Functor
-import arrow.typeclasses.Monad
 import arrow.typeclasses.Monoid
-import kollect.arrow.concurrent.FiniteDuration
+import kollect.arrow.FiniteDuration
 
 /**
  * Timer is a scheduler of tasks.
@@ -73,7 +63,7 @@ interface Timer<F> {
     companion object
 }
 
-@instance(EitherT::class)
+@extension
 interface EitherTTimer<F, L> : Timer<EitherTPartialOf<F, L>> {
     fun FF(): Functor<F>
 
@@ -92,7 +82,7 @@ interface EitherTTimer<F, L> : Timer<EitherTPartialOf<F, L>> {
     }
 }
 
-@instance(OptionT::class)
+@extension
 interface OptionTTimer<F> : Timer<OptionTPartialOf<F>> {
     fun FF(): Functor<F>
 
@@ -111,7 +101,7 @@ interface OptionTTimer<F> : Timer<OptionTPartialOf<F>> {
     }
 }
 
-@instance(WriterT::class)
+@extension
 interface WriterTTimer<F, L> : Timer<WriterTPartialOf<F, L>> {
 
     fun AF(): Applicative<F>
@@ -135,25 +125,7 @@ interface WriterTTimer<F, L> : Timer<WriterTPartialOf<F, L>> {
     }
 }
 
-@instance(StateT::class)
-interface StateTTimer<F, S> : Timer<StateTPartialOf<F, S>> {
-
-    fun MF(): Monad<F>
-
-    fun TF(): Timer<F>
-
-    fun CF(): Clock<F>
-
-    override fun clock(): Clock<StateTPartialOf<F, S>> = object : StateTClock<F, S> {
-        override fun MF(): Monad<F> = MF()
-
-        override fun clock(): Clock<F> = CF()
-    }
-
-    override fun sleep(duration: FiniteDuration): StateT<F, S, Unit> = StateT.lift(MF(), TF().sleep(duration))
-}
-
-@instance(Kleisli::class)
+@extension
 interface KleisliTimer<F, R> : Timer<KleisliPartialOf<F, R>> {
 
     fun TF(): Timer<F>
@@ -165,5 +137,5 @@ interface KleisliTimer<F, R> : Timer<KleisliPartialOf<F, R>> {
     }
 
     override fun sleep(duration: FiniteDuration): Kleisli<F, R, Unit> =
-        Kleisli { TF().sleep(duration) }
+            Kleisli { TF().sleep(duration) }
 }
