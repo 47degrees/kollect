@@ -1,6 +1,6 @@
 rootProject.name = 'kollect'
 
 include ':kollect-core'
-include ':extensions'
-include ':typeclasses'
+include ':kollect-extensions'
+include ':kollect-typeclasses'
 
