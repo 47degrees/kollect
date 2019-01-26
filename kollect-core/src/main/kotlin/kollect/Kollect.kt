@@ -8,16 +8,11 @@ import arrow.core.Option
 import arrow.core.PartialFunction
 import arrow.core.Some
 import arrow.core.Tuple2
-import arrow.data.ForNonEmptyList
 import arrow.data.NonEmptyList
 import arrow.effects.Promise
-import arrow.effects.deferred.Deferred
 import arrow.effects.typeclasses.Concurrent
 import arrow.higherkind
-import arrow.typeclasses.Applicative
-import arrow.typeclasses.Traverse
 import kollect.arrow.concurrent.Ref
-import kollect.arrow.typeclass.ContextShift
 import kollect.arrow.typeclass.Timer
 import java.util.concurrent.TimeUnit
 
@@ -62,9 +57,9 @@ sealed class Kollect<F, A> : KollectOf<F, A> {
         ))
       })
 
-    fun <F, I, A> optional(AF: Concurrent<F>, id: I, ds: DataSource<I, A>): Kollect<F, Option<A>> =
-      Unkollect(AF.binding {
-        val deferred = Deferred<F, KollectStatus>(AF) as Deferred<F, KollectStatus>
+    fun <F, I, A> optional(CF: Concurrent<F>, id: I, ds: DataSource<I, A>): Kollect<F, Option<A>> =
+      Unkollect(CF.binding {
+        val deferred = Promise.unsafeCancelable<F, KollectStatus>(CF)
         val request = KollectQuery.KollectOne(id, ds)
         val result = { a: KollectStatus -> deferred.complete(a) }
         val blocked = BlockedRequest(request, result)
@@ -82,22 +77,26 @@ sealed class Kollect<F, A> : KollectOf<F, A> {
       })
 
     /**
-     * Run a `Kollect`, the result in the `F` monad.
+     * Run a [Kollect], the result in the [F] monad.
      */
     fun <F> run(): KollectRunner<F> = KollectRunner()
 
     class KollectRunner<F> : Any() {
-      operator fun <M, A> invoke(
-        TT: Traverse<ForNonEmptyList>,
-        P: Par<F, M>,
-        C: Concurrent<F>,
-        CS: ContextShift<F>,
+      operator fun <A> invoke(
+        CF: Concurrent<F>,
+        TF: Timer<F>,
+        fa: Kollect<F, A>
+      ): Kind<F, A> =
+        invoke(CF, TF, fa, InMemoryCache.empty(CF))
+
+      operator fun <A> invoke(
+        CF: Concurrent<F>,
         TF: Timer<F>,
         fa: Kollect<F, A>,
-        cache: DataSourceCache<F> = InMemoryCache.empty()
-      ): Kind<F, A> = C.binding {
-        val cacheRef = Ref.of(C, cache).bind()
-        val result = performRun(TT, P, C, CS, TF, fa, cacheRef, None).bind()
+        cache: DataSourceCache<F>
+      ): Kind<F, A> = CF.binding {
+        val cacheRef = Ref.of(CF, cache).bind()
+        val result = performRun(CF, TF, fa, cacheRef, None).bind()
         result
       }
     }
@@ -108,18 +107,22 @@ sealed class Kollect<F, A> : KollectOf<F, A> {
     fun <F> runEnv(): KollectRunnerEnv<F> = KollectRunnerEnv()
 
     class KollectRunnerEnv<F> : Any() {
-      operator fun <M, A> invoke(
-        TT: Traverse<ForNonEmptyList>,
-        P: Par<F, M>,
-        C: Concurrent<F>,
-        CS: ContextShift<F>,
+      operator fun <A> invoke(
+        CF: Concurrent<F>,
+        TF: Timer<F>,
+        fa: Kollect<F, A>
+      ): Kind<F, Tuple2<Env, A>> =
+        invoke(CF, TF, fa, InMemoryCache.empty(CF))
+
+      operator fun <A> invoke(
+        CF: Concurrent<F>,
         TF: Timer<F>,
         fa: Kollect<F, A>,
-        cache: DataSourceCache = InMemoryCache.empty()
-      ): Kind<F, Tuple2<Env, A>> = C.binding {
-        val env = Ref.of<F, Env>(C, KollectEnv()).bind()
-        val cacheRef = Ref.of(C, cache).bind()
-        val result = performRun(TT, P, C, CS, TF, fa, cacheRef, Some(env)).bind()
+        cache: DataSourceCache<F>
+      ): Kind<F, Tuple2<Env, A>> = CF.binding {
+        val env = Ref.of<F, Env>(CF, KollectEnv()).bind()
+        val cacheRef = Ref.of(CF, cache).bind()
+        val result = performRun(CF, TF, fa, cacheRef, Some(env)).bind()
         val e = env.get().bind()
 
         Tuple2(e, result)
@@ -132,17 +135,21 @@ sealed class Kollect<F, A> : KollectOf<F, A> {
     fun <F> runCache(): KollectRunnerCache<F> = KollectRunnerCache()
 
     class KollectRunnerCache<F> : Any() {
-      operator fun <M, A> invoke(
-        TT: Traverse<ForNonEmptyList>,
-        P: Par<F, M>,
-        C: Concurrent<F>,
-        CS: ContextShift<F>,
+      operator fun <A> invoke(
+        CF: Concurrent<F>,
+        TF: Timer<F>,
+        fa: Kollect<F, A>
+      ): Kind<F, Tuple2<DataSourceCache<F>, A>> =
+        invoke(CF, TF, fa, InMemoryCache.empty(CF))
+
+      operator fun <A> invoke(
+        CF: Concurrent<F>,
         TF: Timer<F>,
         fa: Kollect<F, A>,
-        cache: DataSourceCache = InMemoryCache.empty()
-      ): Kind<F, Tuple2<DataSourceCache, A>> = C.binding {
-        val cacheRef = Ref.of(C, cache).bind()
-        val result = performRun(TT, P, C, CS, TF, fa, cacheRef, None).bind()
+        cache: DataSourceCache<F>
+      ): Kind<F, Tuple2<DataSourceCache<F>, A>> = CF.binding {
+        val cacheRef = Ref.of(CF, cache).bind()
+        val result = performRun(CF, TF, fa, cacheRef, None).bind()
         val c = cacheRef.get().bind()
 
         Tuple2(c, result)
@@ -151,61 +158,55 @@ sealed class Kollect<F, A> : KollectOf<F, A> {
 
     // Data fetching
 
-    private fun <M, F, A> performRun(
-      TT: Traverse<ForNonEmptyList>,
-      P: Par<F, M>,
-      C: Concurrent<F>,
-      CS: ContextShift<F>,
+    private fun <F, A> performRun(
+      CF: Concurrent<F>,
       TF: Timer<F>,
       fa: Kollect<F, A>,
-      cache: Ref<F, DataSourceCache>,
+      cache: Ref<F, DataSourceCache<F>>,
       env: Option<Ref<F, Env>>
-    ): Kind<F, A> = C.binding {
+    ): Kind<F, A> = CF.binding {
       val result = fa.run.bind()
       val value = when (result) {
-        is KollectResult.Done -> C.just(result.x)
+        is KollectResult.Done -> CF.just(result.x)
         is KollectResult.Blocked -> binding {
-          fetchRound(TT, P, C, TF, result.rs, cache, env).bind()
-          performRun(TT, P, C, CS, TF, result.cont, cache, env).bind()
+          fetchRound(CF, TF, result.rs, cache, env).bind()
+          performRun(CF, TF, result.cont, cache, env).bind()
         }
         is KollectResult.Throw -> env.fold({
-          C.just(KollectEnv())
+          CF.just(KollectEnv())
         }, {
           it.get()
         }).flatMap { e: Env ->
-          C.raiseError<A>(result.e(e).toThrowable())
+          CF.raiseError<A>(result.e(e).toThrowable())
         }
       }.bind()
       value
     }
 
-    private fun <M, F> fetchRound(
-      TT: Traverse<ForNonEmptyList>,
-      P: Par<F, M>,
-      C: Concurrent<F>,
+    private fun <F> fetchRound(
+      CF: Concurrent<F>,
       TF: Timer<F>,
       rs: RequestMap<F>,
-      cache: Ref<F, DataSourceCache>,
+      cache: Ref<F, DataSourceCache<F>>,
       env: Option<Ref<F, Env>>
     ): Kind<F, Unit> {
       val blockedRequests = rs.m.toList().map { it.second }
       return if (blockedRequests.isEmpty()) {
-        C.just(Unit)
+        CF.just(Unit)
       } else {
-        C.binding {
+        CF.binding {
           val requests =
-            parTraverse(P.parallel(), TT, NonEmptyList.fromListUnsafe(blockedRequests)) {
-              runBlockedRequest(TT, P, C, TF, it, cache)
-            }.bind()
+            KollectExecution.parallel(CF, NonEmptyList.fromListUnsafe(blockedRequests).map {
+              runBlockedRequest(CF, TF, it, cache, env)
+            }).bind()
 
-          val performedRequests = (requests as NonEmptyList<List<Request>>)
-            .foldLeft(listOf<Request>()) { acc, list -> acc + list }
+          val performedRequests = requests.foldLeft(listOf<Request>()) { acc, list -> acc + list }
           if (performedRequests.isEmpty()) {
-            C.just(Unit)
+            CF.just(Unit)
           } else {
             when (env) {
               is Some -> env.t.modify { oldE -> Tuple2(oldE.evolve(Round(performedRequests)), oldE) }
-              is None -> C.just(Unit)
+              is None -> CF.just(Unit)
             }
           }.bind()
           Unit
@@ -213,41 +214,43 @@ sealed class Kollect<F, A> : KollectOf<F, A> {
       }
     }
 
-    private fun <M, F> runBlockedRequest(
-      TT: Traverse<ForNonEmptyList>,
-      P: Par<F, M>,
-      C: Concurrent<F>,
+    private fun <F> runBlockedRequest(
+      CF: Concurrent<F>,
       TF: Timer<F>,
       blocked: BlockedRequest<F>,
-      cache: Ref<F, DataSourceCache>
+      cache: Ref<F, DataSourceCache<F>>,
+      env: Option<Ref<F, Env>>
     ): Kind<F, List<Request>> =
       blocked.request.let { request ->
         when (request) {
-          is KollectQuery.KollectOne<*, *> -> runKollectOne(C, TF, request as KollectQuery.KollectOne<Any, Any>, blocked.result, cache)
-          else -> runBatch(TT, P, C, TF, request as KollectQuery.Batch<Any, Any>, blocked.result, cache)
+          is KollectQuery.KollectOne<*, *> -> runKollectOne(CF, TF, request as KollectQuery.KollectOne<Any, Any>, blocked.result, cache, env)
+          else -> runBatch(CF, TF, request as KollectQuery.Batch<Any, Any>, blocked.result, cache, env)
         }
       }
 
     private fun <F> runKollectOne(
-      C: Concurrent<F>,
+      CF: Concurrent<F>,
       TF: Timer<F>,
       q: KollectQuery.KollectOne<Any, Any>,
       putResult: (KollectStatus) -> Kind<F, Unit>,
-      cache: Ref<F, DataSourceCache>
-    ): Kind<F, List<Request>> = C.binding {
+      cache: Ref<F, DataSourceCache<F>>,
+      env: Option<Ref<F, Env>>
+    ): Kind<F, List<Request>> = CF.binding {
       val c = cache.get().bind()
-      val maybeCached = c.lookup(C, q.id, q.ds).bind()
+      val maybeCached = c.lookup(q.id, q.ds).bind()
       val result = when (maybeCached) {
         // Cached
         is Some -> putResult(KollectStatus.KollectDone(maybeCached.t)).`as`(listOf())
+
+        // Not cached, must kollect
         is None -> binding {
           val startTime = TF.clock().monotonic(TimeUnit.MILLISECONDS).bind()
-          val o = q.ds.fetch(C, q.id).bind()
+          val o = q.ds.fetch(CF, q.id).bind()
           val endTime = TF.clock().monotonic(TimeUnit.MILLISECONDS).bind()
           val res = when (o) {
             // Kollected
             is Some -> binding {
-              val newC = c.insert(C, q.id, o.t, q.ds).bind()
+              val newC = c.insert(q.id, o.t, q.ds).bind()
               cache.set(newC).bind()
               putResult(KollectStatus.KollectDone(o.t)).bind()
               listOf(Request(q, startTime, endTime))
@@ -262,20 +265,19 @@ sealed class Kollect<F, A> : KollectOf<F, A> {
 
     private data class BatchedRequest(val batches: List<KollectQuery.Batch<Any, Any>>, val results: Map<Any, Any>)
 
-    private fun <F, M> runBatch(
-      TT: Traverse<ForNonEmptyList>,
-      P: Par<F, M>,
-      C: Concurrent<F>,
+    private fun <F> runBatch(
+      CF: Concurrent<F>,
       TF: Timer<F>,
       q: KollectQuery.Batch<Any, Any>,
       putResult: (KollectStatus) -> Kind<F, Unit>,
-      cache: Ref<F, DataSourceCache>
-    ): Kind<F, List<Request>> = C.binding {
+      cache: Ref<F, DataSourceCache<F>>,
+      env: Option<Ref<F, Env>>
+    ): Kind<F, List<Request>> = CF.binding {
       val c = cache.get().bind()
 
       // Remove cached IDs
-      val idLookups = q.ids.traverse(C) { i ->
-        c.lookup(C, i, q.ds).tupleLeft(i)
+      val idLookups = q.ids.traverse(CF) { i ->
+        c.lookup(i, q.ds).tupleLeft(i)
       }.bind()
 
       val cachedResults = idLookups.collect<Tuple2<Any, Option<Any>>, Pair<Any, Any>>(PartialFunction(
@@ -290,7 +292,7 @@ sealed class Kollect<F, A> : KollectOf<F, A> {
 
       val result = when {
         // All cached
-        uncachedIds.isEmpty() -> putResult(KollectStatus.KollectDone(cachedResults)).flatMap { C.just(listOf<Request>()) }
+        uncachedIds.isEmpty() -> putResult(KollectStatus.KollectDone(cachedResults)).`as`(listOf<Request>())
 
         // Some uncached
         else -> binding {
@@ -302,17 +304,17 @@ sealed class Kollect<F, A> : KollectOf<F, A> {
           val batchedRequest = request.ds.maxBatchSize().let { maxBatchSize ->
             when (maxBatchSize) {
               // Unbatched
-              is None -> request.ds.batch(TT, C, P, uncached).map {
+              is None -> request.ds.batch(CF, uncached).map {
                 BatchedRequest(listOf(request), it)
               }
               // Batched
-              is Some -> runBatchedRequest(TT, P, C, request, maxBatchSize.t, request.ds.batchExecution())
+              is Some -> runBatchedRequest(CF, request, maxBatchSize.t, request.ds.batchExecution())
             }
           }.bind()
 
           val endTime = TF.clock().monotonic(TimeUnit.MILLISECONDS).bind()
           val resultMap = combineBatchResults(batchedRequest.results, cachedResults)
-          val updatedCache = c.insertMany(C, batchedRequest.results, request.ds).bind()
+          val updatedCache = c.bulkInsert(CF, batchedRequest.results.toList().map { Tuple2(it.first, it.second) }, request.ds).bind()
 
           cache.set(updatedCache).bind()
           putResult(KollectStatus.KollectDone(resultMap)).bind()
@@ -323,10 +325,8 @@ sealed class Kollect<F, A> : KollectOf<F, A> {
       result
     }
 
-    private fun <F, M> runBatchedRequest(
-      TT: Traverse<ForNonEmptyList>,
-      P: Par<F, M>,
-      C: Concurrent<F>,
+    private fun <F> runBatchedRequest(
+      CF: Concurrent<F>,
       q: KollectQuery.Batch<Any, Any>,
       batchSize: Int,
       e: BatchExecution
@@ -338,14 +338,12 @@ sealed class Kollect<F, A> : KollectOf<F, A> {
       val requests = batches.all.map { KollectQuery.Batch(it, q.ds) }
 
       val results = when (e) {
-        is Sequentially -> batches.traverse(C) { q.ds.batch(TT, C, P, it) }
-        is InParallel -> parTraverse(P.parallel(), TT, batches) { q.ds.batch(TT, C, P, it) }
+        is Sequentially -> batches.traverse(CF) { q.ds.batch(CF, it) }
+        is InParallel -> KollectExecution.parallel(CF, batches.map { q.ds.batch(CF, it) })
       }
 
-      return C.run {
-        results.map {
-          (it as NonEmptyList<Map<Any, Any>>).all.reduce(::combineBatchResults)
-        }.map { BatchedRequest(requests, it) }
+      return CF.run {
+        results.map { it.all.reduce(::combineBatchResults) }.map { BatchedRequest(requests, it) }
       }
     }
 
