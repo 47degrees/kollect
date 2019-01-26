@@ -1,5 +1,6 @@
 dependencies {
     implementation project(':typeclasses')
+    implementation project(':kollect-core')
 
     implementation "org.jetbrains.kotlin:kotlin-stdlib-jdk8:$kotlinVersion"
 
