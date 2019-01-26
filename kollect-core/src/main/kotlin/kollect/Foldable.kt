@@ -1,4 +1,4 @@
-package kollect.arrow
+package kollect
 
 import arrow.typeclasses.Foldable
 import arrow.typeclasses.Monad
