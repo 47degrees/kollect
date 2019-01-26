@@ -6,13 +6,9 @@ import arrow.core.Option
 import arrow.core.PartialFunction
 import arrow.core.Some
 import arrow.core.Tuple2
-import arrow.data.ForNonEmptyList
+import arrow.core.toT
 import arrow.data.NonEmptyList
-import arrow.typeclasses.Traverse
-import kollect.arrow.Par
-import kollect.arrow.collect
-import kollect.arrow.typeclass.Concurrent
-import kollect.arrow.typeclass.Parallel.Companion.parTraverse
+import arrow.effects.typeclasses.Concurrent
 
 sealed class BatchExecution
 object Sequentially : BatchExecution()
@@ -23,39 +19,37 @@ object InParallel : BatchExecution()
  */
 interface DataSource<I, A> {
 
-    /**
-     * Name given to the data source. It takes the string "KollectDataSource:${this.javaClass.simpleName}" as a default,
-     * but can be overriden.
-     */
-    fun name(): String = "KollectDataSource:${this.javaClass.simpleName}"
+  /**
+   * Name given to the data source. Defaults to "KollectDataSource:${this.javaClass.simpleName}".
+   */
+  fun name(): String = "KollectDataSource:${this.javaClass.simpleName}"
 
-    /**
-     * Fetches a value from the source of data by its given Identity.
-     *
-     * @param id for the fetched item I.
-     * @return IO<Option<A>> since this operation represents an IO computation that returns an optional result. In
-     * case the result is not found, it'll return None.
-     */
-    fun <F> fetch(CF: Concurrent<F>, id: I): Kind<F, Option<A>>
+  /**
+   * Fetches a value from the source of data by its given Identity. Requires an instance of Concurrent.
+   *
+   * @param id for the fetched item I.
+   * @return IO<Option<A>> since this operation represents an IO computation that returns an optional result. In
+   * case the result is not found, it'll return None.
+   */
+  fun <F> fetch(CF: Concurrent<F>, id: I): Kind<F, Option<A>>
 
-    @Suppress("UNCHECKED_CAST")
-    fun <F, G> batch(
-        TT: Traverse<ForNonEmptyList>,
-        CF: Concurrent<F>,
-        P: Par<F, G>,
-        ids: NonEmptyList<I>
-    ): Kind<F, Map<I, A>> = CF.run {
-        parTraverse(P.parallel(), TT, ids) { id ->
-            fetch(CF, id).map { (it as Kind<F, A>).tupleLeft(id) }
-        }.map {
-            it.collect<Kind<F, Tuple2<I, A>>, Pair<I, A>>(PartialFunction(
-                definedAt = { value -> value is Some<*> },
-                ifDefined = { value -> (value as Some<Pair<I, A>>).t }
-            )).toMap()
-        }
-    }
+  /**
+   * Fetch many identities, returning a mapping from identities to results. If an
+   * identity wasn't found, it won't appear in the keys.
+   */
+  fun <F> batch(CF: Concurrent<F>, ids: NonEmptyList<I>): Kind<F, Map<I, A>> = CF.binding {
+    val tuples = KollectExecution.parallel(
+      CF,
+      ids.map { id -> fetch(CF, id).map { v -> id.toT(v) } }
+    ).bind()
+    val results: List<Tuple2<I, A>> = tuples.collect(PartialFunction(
+      definedAt = { it.b is Some<A> },
+      ifDefined = { it.a.toT((it.b as Some<A>).t) }
+    ))
+    results.associateBy({ it.a }, { it.b })
+  }
 
-    fun maxBatchSize(): Option<Int> = None
+  fun maxBatchSize(): Option<Int> = None
 
-    fun batchExecution(): BatchExecution = InParallel
+  fun batchExecution(): BatchExecution = InParallel
 }

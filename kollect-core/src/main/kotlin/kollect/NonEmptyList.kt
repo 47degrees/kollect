@@ -1,4 +1,4 @@
-package kollect.arrow
+package kollect
 
 import arrow.Kind
 import arrow.core.PartialFunction

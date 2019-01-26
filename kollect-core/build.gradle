@@ -5,6 +5,8 @@ dependencies {
     implementation "io.arrow-kt:arrow-effects:$arrowVersion"
 
     kapt "io.arrow-kt:arrow-annotations-processor:$arrowVersion"
+
+    implementation "org.jetbrains.kotlinx:kotlinx-coroutines-core:$kotlinxCoroutinesVersion"
 }
 
 apply from: rootProject.file('gradle/gradle-mvn-push.gradle')
