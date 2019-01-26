@@ -11,7 +11,7 @@ object syntax {
       Kollect.just(CF, a)
   }
 
-  /** syntax to lift exception to Fetch errors */
+  /** syntax to lift exception to Kollect errors */
   class FetchExceptionSyntax<B>(val a: Throwable) : Any() {
 
     fun <F> fetch(CF: Concurrent<F>): Kollect<F, B> =
