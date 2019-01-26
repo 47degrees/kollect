@@ -10,9 +10,9 @@ import arrow.core.Some
 import arrow.core.Tuple2
 import arrow.data.NonEmptyList
 import arrow.effects.Promise
+import arrow.effects.Ref
 import arrow.effects.typeclasses.Concurrent
 import arrow.higherkind
-import kollect.arrow.concurrent.Ref
 import kollect.arrow.typeclass.Timer
 import java.util.concurrent.TimeUnit
 
@@ -95,7 +95,7 @@ sealed class Kollect<F, A> : KollectOf<F, A> {
         fa: Kollect<F, A>,
         cache: DataSourceCache<F>
       ): Kind<F, A> = CF.binding {
-        val cacheRef = Ref.of(CF, cache).bind()
+        val cacheRef = Ref.of(cache, CF).bind()
         val result = performRun(CF, TF, fa, cacheRef, None).bind()
         result
       }
@@ -120,8 +120,8 @@ sealed class Kollect<F, A> : KollectOf<F, A> {
         fa: Kollect<F, A>,
         cache: DataSourceCache<F>
       ): Kind<F, Tuple2<Env, A>> = CF.binding {
-        val env = Ref.of<F, Env>(CF, KollectEnv()).bind()
-        val cacheRef = Ref.of(CF, cache).bind()
+        val env = Ref.of<F, Env>(KollectEnv(), CF).bind()
+        val cacheRef = Ref.of(cache, CF).bind()
         val result = performRun(CF, TF, fa, cacheRef, Some(env)).bind()
         val e = env.get().bind()
 
@@ -148,7 +148,7 @@ sealed class Kollect<F, A> : KollectOf<F, A> {
         fa: Kollect<F, A>,
         cache: DataSourceCache<F>
       ): Kind<F, Tuple2<DataSourceCache<F>, A>> = CF.binding {
-        val cacheRef = Ref.of(CF, cache).bind()
+        val cacheRef = Ref.of(cache, CF).bind()
         val result = performRun(CF, TF, fa, cacheRef, None).bind()
         val c = cacheRef.get().bind()
 
