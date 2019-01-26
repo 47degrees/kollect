@@ -9,7 +9,7 @@ import arrow.effects.Promise
 import arrow.effects.Ref
 import arrow.effects.typeclasses.Concurrent
 import arrow.higherkind
-import kollect.arrow.typeclass.Timer
+import kollect.typeclasses.Timer
 import java.util.concurrent.TimeUnit
 
 // Kollect data type

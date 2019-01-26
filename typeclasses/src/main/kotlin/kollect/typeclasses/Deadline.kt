@@ -1,4 +1,4 @@
-package kollect.arrow
+package kollect.typeclasses
 
 import java.util.concurrent.TimeUnit
 
@@ -54,7 +54,7 @@ data class Deadline(val time: FiniteDuration) {
      * '''''Note that on some systems this operation is costly because it entails a system call.'''''
      * Check `System.nanoTime` for your platform.
      */
-    fun timeLeft(): FiniteDuration = this - Deadline.now()
+    fun timeLeft(): FiniteDuration = this - now()
 
     /**
      * Determine whether the deadline still lies in the future at the point where this method is called.

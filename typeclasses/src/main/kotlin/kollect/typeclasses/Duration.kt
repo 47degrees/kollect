@@ -1,8 +1,8 @@
-package kollect.arrow
+package kollect.typeclasses
 
 import arrow.core.Some
 import arrow.core.toOption
-import kollect.arrow.Duration.Companion.Infinite
+import kollect.typeclasses.Duration.Companion.Infinite
 import java.lang.Math
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.TimeUnit.*
@@ -105,7 +105,7 @@ sealed abstract class Duration : Comparable<Duration> {
          * `d, day, h, hour, min, minute, s, sec, second, ms, milli, millisecond, µs, micro, microsecond, ns, nano, nanosecond`
          * and their pluralized forms (for every but the first mentioned form of each unit, i.e. no "ds", but "days").
          */
-        inline operator fun invoke(length: Long, unit: String): FiniteDuration = FiniteDuration(length, Duration.timeUnit[unit]!!)
+        inline operator fun invoke(length: Long, unit: String): FiniteDuration = FiniteDuration(length, timeUnit[unit]!!)
 
         // Double stores 52 bits mantissa, but there is an implied '1' in front, making the limit 2^53
         val maxPreciseDouble: Double = 9007199254740992.0
@@ -200,7 +200,7 @@ sealed abstract class Duration : Comparable<Duration> {
          * @throws IllegalArgumentException for `Long.MinValue` since that would lead to inconsistent behavior afterwards (cannot be negated)
          */
         fun fromNanos(nanos: Long): FiniteDuration =
-                if (nanos % d_per_ns == 0L) Duration(nanos / d_per_ns, TimeUnit.DAYS)
+                if (nanos % d_per_ns == 0L) Duration(nanos / d_per_ns, DAYS)
                 else if (nanos % h_per_ns == 0L) Duration(nanos / h_per_ns, HOURS)
                 else if (nanos % min_per_ns == 0L) Duration(nanos / min_per_ns, MINUTES)
                 else if (nanos % s_per_ns == 0L) Duration(nanos / s_per_ns, SECONDS)
@@ -212,7 +212,7 @@ sealed abstract class Duration : Comparable<Duration> {
          * Preconstructed value of `0.days`.
          */
         // unit as coarse as possible to keep (_ + Zero) sane unit-wise
-        val Zero: FiniteDuration = FiniteDuration(0, TimeUnit.DAYS)
+        val Zero: FiniteDuration = FiniteDuration(0, DAYS)
 
         sealed class Infinite : Duration() {
             override operator fun plus(other: Duration): Duration = when {
@@ -581,7 +581,7 @@ class FiniteDuration(override val length: Long, override val unit: TimeUnit) : D
 
         inline operator fun invoke(length: Long, unit: TimeUnit): FiniteDuration = FiniteDuration(length, unit)
 
-        inline operator fun invoke(length: Long, unit: String): FiniteDuration = FiniteDuration(length, Duration.timeUnit[unit]!!)
+        inline operator fun invoke(length: Long, unit: String): FiniteDuration = FiniteDuration(length, timeUnit[unit]!!)
 
         // limit on abs. value of durations in their units
         private val max_ns = Long.MAX_VALUE

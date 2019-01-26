@@ -1,7 +1,4 @@
 dependencies {
-    implementation project(':extensions')
-    implementation project(':typeclasses')
-
     implementation "org.jetbrains.kotlin:kotlin-stdlib-jdk8:$kotlinVersion"
 
     implementation "io.arrow-kt:arrow-core-data:$arrowVersion"
