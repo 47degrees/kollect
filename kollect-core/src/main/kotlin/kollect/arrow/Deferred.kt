@@ -70,7 +70,6 @@ abstract class Deferred<F, A> : DeferredOf<F, A> {
 
     companion object {
 
-
         /** Creates an unset promise. **/
         operator fun <F, A> invoke(AF: Concurrent<F>): arrow.Kind<F, Deferred<F, A>> = AF { unsafe<F, A>(AF) }
 

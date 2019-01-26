@@ -32,13 +32,13 @@ interface Promise<T> {
      *
      *  $nonDeterministic
      *
-     *  @return    `true` if the promise is already completed, `false` otherwise
+     *  @return `true` if the promise is already completed, `false` otherwise
      */
     fun isCompleted(): Boolean
 
     /** Completes the promise with either an exception or a value.
      *
-     *  @param result     Either the value or the exception to complete the promise with.
+     *  @param result Either the value or the exception to complete the promise with.
      *
      *  $promiseCompletion
      */
@@ -49,19 +49,19 @@ interface Promise<T> {
      *
      *  $nonDeterministic
      *
-     *  @return    If the promise has already been completed returns `false`, or `true` otherwise.
+     *  @return If the promise has already been completed returns `false`, or `true` otherwise.
      */
     fun tryComplete(result: Try<T>): Boolean
 
     /** Completes this promise with the specified future, once that future is completed.
      *
-     *  @return   This promise
+     *  @return This promise
      */
     fun completeWith(other: Future<T>): Promise<T> = tryCompleteWith(other)
 
     /** Attempts to complete this promise with the specified future, once that future is completed.
      *
-     *  @return   This promise
+     *  @return This promise
      */
     fun tryCompleteWith(other: Future<T>): Promise<T> {
         if (other != this.future()) { // this tryCompleteWith this doesn't make much sense
@@ -82,13 +82,13 @@ interface Promise<T> {
      *
      *  $nonDeterministic
      *
-     *  @return    If the promise has already been completed returns `false`, or `true` otherwise.
+     *  @return If the promise has already been completed returns `false`, or `true` otherwise.
      */
     fun trySuccess(value: T): Boolean = tryComplete(Success(value))
 
     /** Completes the promise with an exception.
      *
-     *  @param cause    The throwable to complete the promise with.
+     *  @param cause The throwable to complete the promise with.
      *
      *  $allowedThrowables
      *
@@ -100,7 +100,7 @@ interface Promise<T> {
      *
      *  $nonDeterministic
      *
-     *  @return    If the promise has already been completed returns `false`, or `true` otherwise.
+     *  @return If the promise has already been completed returns `false`, or `true` otherwise.
      */
     fun tryFailure(cause: Throwable): Boolean = tryComplete(Failure(cause))
 
@@ -108,28 +108,28 @@ interface Promise<T> {
         /** Creates a promise object which can be completed with a value.
          *
          *  @tparam T       the type of the value in the promise
-         *  @return         the newly created `Promise` object
+         *  @return the newly created `Promise` object
          */
         operator fun <T> invoke(): Promise<T> = DefaultPromise()
 
         /** Creates an already completed Promise with the specified exception.
          *
          *  @tparam T       the type of the value in the promise
-         *  @return         the newly created `Promise` object
+         *  @return the newly created `Promise` object
          */
         fun <T> failed(exception: Throwable): Promise<T> = fromTry(Failure(exception))
 
         /** Creates an already completed Promise with the specified result.
          *
          *  @tparam T       the type of the value in the promise
-         *  @return         the newly created `Promise` object
+         *  @return the newly created `Promise` object
          */
         fun <T> successful(result: T): Promise<T> = fromTry(Success(result))
 
         /** Creates an already completed Promise with the specified result or exception.
          *
          *  @tparam T       the type of the value in the promise
-         *  @return         the newly created `Promise` object
+         *  @return the newly created `Promise` object
          */
         fun <T> fromTry(result: Try<T>): Promise<T> = KeptPromise(result)
     }

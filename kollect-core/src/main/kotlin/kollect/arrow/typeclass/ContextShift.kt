@@ -45,7 +45,7 @@ interface ContextShift<F> {
      * dedicated execution context.
      *
      * @param ec Execution context where the evaluation has to be scheduled
-     * @param fa  Computation to evaluate using `ec`
+     * @param fa Computation to evaluate using `ec`
      */
     fun <A> evalOn(ec: ExecutionContext, fa: arrow.Kind<F, A>): arrow.Kind<F, A>
 

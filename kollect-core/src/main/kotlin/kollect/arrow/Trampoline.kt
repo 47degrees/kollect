@@ -2,7 +2,6 @@ package kollect.arrow
 
 import arrow.effects.internal.Platform
 
-
 /**
  * Trampoline implementation, meant to be stored in a `ThreadLocal`.
  * See `TrampolineEC`.

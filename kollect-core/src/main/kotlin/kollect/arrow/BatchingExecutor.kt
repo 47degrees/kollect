@@ -4,7 +4,6 @@ import kollect.arrow.OnCompleteRunnable
 import kollect.arrow.concurrent.BlockContext
 import java.util.concurrent.Executor
 
-
 /**
  * Executor which groups multiple nested `Runnable.run()` calls into a single Runnable passed to the original Executor.
  * This can be a useful optimization because it bypasses the original context's task queue and keeps related (nested)

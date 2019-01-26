@@ -305,7 +305,7 @@ object KeptPromise {
             // override def mapTo[S](implicit tag: ClassTag[S]): Future[S] = thisAs[S]
         }
     }
-    
+
     operator fun <T> invoke(result: Try<T>): Promise<T> {
         val resolvedTry = PromiseImpl.resolveTry(result)
         return when (resolvedTry) {

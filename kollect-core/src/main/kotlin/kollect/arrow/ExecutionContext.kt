@@ -48,13 +48,13 @@ interface ExecutionContext {
 
     /** Runs a block of code on this execution context.
      *
-     *  @param runnable  the task to execute
+     *  @param runnable the task to execute
      */
     fun execute(runnable: Runnable): Unit
 
     /** Reports that an asynchronous computation failed.
      *
-     *  @param cause  the cause of the failure
+     *  @param cause the cause of the failure
      */
     fun reportFailure(cause: Throwable): Unit
 
@@ -116,9 +116,9 @@ interface ExecutionContext {
 
         /** Creates an `ExecutionContext` from the given `ExecutorService`.
          *
-         *  @param e         the `ExecutorService` to use. If `null`, a new `ExecutorService` is created with [[scala.concurrent.ExecutionContext$.global default configuration]].
-         *  @param reporter  a function for error reporting
-         *  @return          the `ExecutionContext` using the given `ExecutorService`
+         *  @param e the `ExecutorService` to use. If `null`, a new `ExecutorService` is created with [[scala.concurrent.ExecutionContext$.global default configuration]].
+         *  @param reporter a function for error reporting
+         *  @return the `ExecutionContext` using the given `ExecutorService`
          */
         fun fromExecutorService(e: ExecutorService, reporter: (Throwable) -> Unit): ExecutionContextExecutorService =
             ExecutionContextImpl.fromExecutorService(e, reporter)
@@ -134,15 +134,15 @@ interface ExecutionContext {
          *  }}}
          *
          *  @param e the `ExecutorService` to use. If `null`, a new `ExecutorService` is created with [[scala.concurrent.ExecutionContext$.global default configuration]].
-         *  @return  the `ExecutionContext` using the given `ExecutorService`
+         *  @return the `ExecutionContext` using the given `ExecutorService`
          */
         fun fromExecutorService(e: ExecutorService): ExecutionContextExecutorService = fromExecutorService(e, defaultReporter())
 
         /** Creates an `ExecutionContext` from the given `Executor`.
          *
-         *  @param e         the `Executor` to use. If `null`, a new `Executor` is created with [[scala.concurrent.ExecutionContext$.global default configuration]].
-         *  @param reporter  a function for error reporting
-         *  @return          the `ExecutionContext` using the given `Executor`
+         *  @param e the `Executor` to use. If `null`, a new `Executor` is created with [[scala.concurrent.ExecutionContext$.global default configuration]].
+         *  @param reporter a function for error reporting
+         *  @return the `ExecutionContext` using the given `Executor`
          */
         fun fromExecutor(e: Executor, reporter: (Throwable) -> Unit): ExecutionContextExecutor =
             ExecutionContextImpl.fromExecutor(e, reporter)
@@ -150,7 +150,7 @@ interface ExecutionContext {
         /** Creates an `ExecutionContext` from the given `Executor` with the [[scala.concurrent.ExecutionContext$.defaultReporter default reporter]].
          *
          *  @param e the `Executor` to use. If `null`, a new `Executor` is created with [[scala.concurrent.ExecutionContext$.global default configuration]].
-         *  @return  the `ExecutionContext` using the given `Executor`
+         *  @return the `ExecutionContext` using the given `Executor`
          */
         fun fromExecutor(e: Executor): ExecutionContextExecutor = fromExecutor(e, defaultReporter())
 

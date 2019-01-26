@@ -58,7 +58,6 @@ data class InMemoryCache(
     ): Kind<F, DataSourceCache> =
         CF.just(copy(state = state.updated(Tuple2(DataSourceName(ds.name()), DataSourceId(i)), DataSourceResult(v))))
 
-
     companion object {
 
         fun empty(): InMemoryCache = InMemoryCache(emptyMap())

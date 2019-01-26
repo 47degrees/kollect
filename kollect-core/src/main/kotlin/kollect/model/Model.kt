@@ -6,7 +6,6 @@ import kollect.Env
 import kollect.Kollect
 import kollect.NoStackTrace
 
-
 sealed class KollectRequest
 
 /**

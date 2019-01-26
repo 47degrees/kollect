@@ -83,7 +83,6 @@ private fun <I, A, F> combineRequestMaps(MF: Monad<F>, x: RequestMap<F>, y: Requ
         acc.filterNot { it.key == tuple.key } + mapOf(tuple.key to combinedReq)
     })
 
-
 /**
  * Combines two requests to the same data source.
  */

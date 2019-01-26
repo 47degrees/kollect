@@ -4,7 +4,6 @@ import arrow.core.Some
 import arrow.core.toOption
 import kollect.arrow.Deadline
 import kollect.arrow.concurrent.Duration.Companion.Infinite
-import java.lang.ArithmeticException
 import java.lang.Math
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.TimeUnit.DAYS
@@ -115,7 +114,6 @@ sealed abstract class Duration : Comparable<Duration> {
          */
         inline operator fun invoke(length: Long, unit: String): FiniteDuration = FiniteDuration(length, Duration.timeUnit[unit]!!)
 
-
         // Double stores 52 bits mantissa, but there is an implied '1' in front, making the limit 2^53
         val maxPreciseDouble: Double = 9007199254740992.0
 
@@ -150,9 +148,7 @@ sealed abstract class Duration : Comparable<Duration> {
         // "ms milli millisecond" -> List("ms", "milli", "millis", "millisecond", "milliseconds")
         private fun words(s: String) = (s.trim().split("\\s+").toList())
 
-        private fun expandLabels(labels: String): List<String> {
-            return listOf(words(labels).first()) + words(labels).drop(1).flatMap { s -> listOf(s, s + "s") }
-        }
+        private fun expandLabels(labels: String): List<String> = listOf(words(labels).first()) + words(labels).drop(1).flatMap { s -> listOf(s, s + "s") }
 
         private val timeUnitLabels = listOf(
             TimeUnit.DAYS to "d day",
@@ -187,8 +183,7 @@ sealed abstract class Duration : Comparable<Duration> {
          *
          * @throws IllegalArgumentException if the length was finite but the resulting duration cannot be expressed as a [[FiniteDuration]]
          */
-        fun fromNanos(nanos: Double): Duration {
-            return if (nanos.isInfinite())
+        fun fromNanos(nanos: Double): Duration = if (nanos.isInfinite())
                 if (nanos > 0) Infinite.Inf() else Infinite.MinusInf()
             else if (JDouble.isNaN(nanos))
                 Infinite.Undefined()
@@ -196,7 +191,6 @@ sealed abstract class Duration : Comparable<Duration> {
                 throw IllegalArgumentException("trying to construct too large duration with " + nanos + "ns")
             else
                 fromNanos(Math.round(nanos))
-        }
 
         private val µs_per_ns = 1000L
         private val ms_per_ns = µs_per_ns * 1000
@@ -290,7 +284,6 @@ sealed abstract class Duration : Comparable<Duration> {
                 override fun div(divisor: Double): Duration = this
                 override fun div(divisor: Duration): Double = Double.NaN
 
-
                 override fun compareTo(other: Duration) = if (other == this) 0 else 1
                 override operator fun unaryMinus(): Duration = this
                 override fun toUnit(unit: TimeUnit): Double = Double.NaN
@@ -307,7 +300,7 @@ sealed abstract class Duration : Comparable<Duration> {
                 override fun toString(): String = "Duration.Inf"
                 override fun compareTo(other: Duration) = when (other) {
                     is Undefined -> -1 // Undefined != Undefined
-                    this -> 0  // `case Inf` will include null checks in the byte code
+                    this -> 0 // `case Inf` will include null checks in the byte code
                     else -> 1
                 }
 
@@ -735,7 +728,6 @@ class FiniteDuration(override val length: Long, override val unit: TimeUnit) : D
      */
     fun divLong(divisor: Long) = this / divisor
 
-
     /**
      * Return the product of this duration and the given integer factor.
      *
@@ -746,7 +738,6 @@ class FiniteDuration(override val length: Long, override val unit: TimeUnit) : D
     override operator fun unaryMinus(): Duration = Duration(-length, unit)
 
     override fun isFinite() = true
-
 
     override fun toCoarsest(): FiniteDuration {
         fun loop(length: Long, unit: TimeUnit): FiniteDuration {

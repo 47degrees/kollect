@@ -1,20 +1,10 @@
 dependencies {
-    compile "org.jetbrains.kotlin:kotlin-stdlib-jdk7:$kotlinVersion"
-    compile "io.arrow-kt:arrow-free:$arrowVersion"
-    compile "io.arrow-kt:arrow-effects:$arrowVersion"
-    compile "io.arrow-kt:arrow-effects-kotlinx-coroutines:$arrowVersion"
-    compile "io.arrow-kt:arrow-instances-core:$arrowVersion"
-    compile "io.arrow-kt:arrow-instances-data:$arrowVersion"
-    compile "io.arrow-kt:arrow-typeclasses:$arrowVersion"
-    compile "io.arrow-kt:arrow-mtl:$arrowVersion"
-    compile "io.arrow-kt:arrow-data:$arrowVersion"
-    compile "io.arrow-kt:arrow-generic:$arrowVersion"
+    implementation "org.jetbrains.kotlin:kotlin-stdlib-jdk8:$kotlinVersion"
+
+    implementation "io.arrow-kt:arrow-core-data:$arrowVersion"
+    implementation "io.arrow-kt:arrow-effects:$arrowVersion"
 
     kapt "io.arrow-kt:arrow-annotations-processor:$arrowVersion"
-
-    testCompile "io.arrow-kt:arrow-test:$arrowVersion"
-    kaptTest "io.arrow-kt:arrow-annotations-processor:$arrowVersion"
-    testCompileOnly "io.arrow-kt:arrow-annotations-processor:$arrowVersion"
 }
 
 apply from: rootProject.file('gradle/gradle-mvn-push.gradle')

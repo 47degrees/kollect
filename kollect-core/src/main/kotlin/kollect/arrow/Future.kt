@@ -101,23 +101,23 @@ interface Future<out T> : Awaitable<T> {
          *
          *  @tparam T        the type of the value in the future
          *  @param exception the non-null instance of `Throwable`
-         *  @return          the newly created `Future` instance
+         *  @return the newly created `Future` instance
          */
         fun <T> failed(exception: Throwable): Future<T> = Promise.failed<T>(exception).future()
 
         /** Creates an already completed Future with the specified result.
          *
          *  @tparam T       the type of the value in the future
-         *  @param result   the given successful value
-         *  @return         the newly created `Future` instance
+         *  @param result the given successful value
+         *  @return the newly created `Future` instance
          */
         fun <T> successful(result: T): Future<T> = Promise.successful(result).future()
 
         /** Creates an already completed Future with the specified result or exception.
          *
          *  @tparam T       the type of the value in the `Future`
-         *  @param result   the result of the returned `Future` instance
-         *  @return         the newly created `Future` instance
+         *  @param result the result of the returned `Future` instance
+         *  @return the newly created `Future` instance
          */
         fun <T> fromTry(result: Try<T>): Future<T> = Promise.fromTry(result).future()
 
@@ -133,9 +133,9 @@ interface Future<out T> : Awaitable<T> {
          *  The result becomes available once the asynchronous computation is completed.
          *
          *  @tparam T        the type of the result
-         *  @param body      the asynchronous computation
-         *  @param executor  the execution context on which the future is run
-         *  @return          the `Future` holding the result of the computation
+         *  @param body the asynchronous computation
+         *  @param executor the execution context on which the future is run
+         *  @return the `Future` holding the result of the computation
          */
         fun <T> apply(executor: ExecutionContext, body: () -> T): Future<T> = unit.map(executor) { body() }
 
@@ -157,8 +157,8 @@ interface Future<out T> : Awaitable<T> {
          *  in the list that is completed. This means no matter if it is completed as a success or as a failure.
          *
          * @tparam T        the type of the value in the future
-         * @param futures   the `TraversableOnce` of Futures in which to find the first completed
-         * @return          the `Future` holding the result of the future that is first to be completed
+         * @param futures the `TraversableOnce` of Futures in which to find the first completed
+         * @return the `Future` holding the result of the future that is first to be completed
          */
         fun <T> firstCompletedOf(futures: List<Future<T>>, executor: ExecutionContext): Future<T> {
             val p = Promise<T>()
@@ -178,9 +178,9 @@ interface Future<out T> : Awaitable<T> {
          *  of the first `Future` with a result that matches the predicate, failed `Future`s will be ignored.
          *
          * @tparam T        the type of the value in the future
-         * @param futures   the `scala.collection.immutable.Iterable` of Futures to search
-         * @param p         the predicate which indicates if it's a match
-         * @return          the `Future` holding the optional result of the search
+         * @param futures the `scala.collection.immutable.Iterable` of Futures to search
+         * @param p the predicate which indicates if it's a match
+         * @return the `Future` holding the optional result of the search
          */
         fun <T> find(executor: ExecutionContext, futures: Iterable<Future<T>>, p: (T) -> Boolean): Future<Option<T>> {
             fun searchNext(i: Iterator<Future<T>>): Future<Option<T>> =
@@ -210,10 +210,10 @@ interface Future<out T> : Awaitable<T> {
          *
          * @tparam T       the type of the value of the input Futures
          * @tparam R       the type of the value of the returned `Future`
-         * @param futures  the `scala.collection.immutable.Iterable` of Futures to be folded
-         * @param zero     the start value of the fold
-         * @param op       the fold operation to be applied to the zero and futures
-         * @return         the `Future` holding the result of the fold
+         * @param futures the `scala.collection.immutable.Iterable` of Futures to be folded
+         * @param zero the start value of the fold
+         * @param op the fold operation to be applied to the zero and futures
+         * @return the `Future` holding the result of the fold
          */
         fun <T, R> foldLeft(executor: ExecutionContext, futures: Iterable<Future<T>>, zero: R, op: (R, T) -> R): Future<R> =
             foldNext(executor, futures.iterator(), zero, op)
@@ -224,7 +224,6 @@ interface Future<out T> : Awaitable<T> {
             } else {
                 i.next().flatMap(executor) { value -> foldNext(executor, i, op(prevValue, value), op) }
             }
-
 
 //        /** A non-blocking, asynchronous fold over the specified futures, with the start value of the given zero.
 //         *  The fold is performed on the thread where the last future is completed,
@@ -260,9 +259,9 @@ interface Future<out T> : Awaitable<T> {
          *  }}}
          * @tparam T       the type of the value of the input Futures
          * @tparam R       the type of the value of the returned `Future`
-         * @param futures  the `scala.collection.immutable.Iterable` of Futures to be reduced
-         * @param op       the reduce operation which is applied to the results of the futures
-         * @return         the `Future` holding the result of the reduce
+         * @param futures the `scala.collection.immutable.Iterable` of Futures to be reduced
+         * @param op the reduce operation which is applied to the results of the futures
+         * @return the `Future` holding the result of the reduce
          */
         fun <R, T : R> reduceLeft(executor: ExecutionContext, futures: Iterable<Future<T>>, op: (R, T) -> R): Future<R> {
             val i = futures.iterator()
@@ -364,7 +363,7 @@ interface Future<out T> : Awaitable<T> {
      *  $callbackInContext
      *
      * @tparam U    only used to accept any return type of the given callback function
-     * @param f     the function to be executed when this `Future` completes
+     * @param f the function to be executed when this `Future` completes
      * @group Callbacks
      */
     fun <U : Any> onComplete(executor: ExecutionContext, f: (Try<T>) -> U): Unit
@@ -376,7 +375,7 @@ interface Future<out T> : Awaitable<T> {
      *
      *  $nonDeterministic
      *
-     *  @return    `true` if the future was completed, `false` otherwise
+     *  @return `true` if the future was completed, `false` otherwise
      * @group Polling
      */
     fun isCompleted(): Boolean
@@ -390,7 +389,7 @@ interface Future<out T> : Awaitable<T> {
      *  if it contained a valid result, or `Some(Failure(error))` if it contained
      *  an exception.
      *
-     * @return    `None` if the `Future` wasn't completed, `Some` if it was.
+     * @return `None` if the `Future` wasn't completed, `Some` if it was.
      * @group Polling
      */
     fun value(): Option<Try<T>>
@@ -423,7 +422,7 @@ interface Future<out T> : Awaitable<T> {
      *  $swallowsExceptions
      *
      * @tparam U     only used to accept any return type of the given callback function
-     * @param f      the function which will be executed if this `Future` completes with a result,
+     * @param f the function which will be executed if this `Future` completes with a result,
      *               the return value of `f` will be discarded.
      * @group Callbacks
      */
@@ -437,9 +436,9 @@ interface Future<out T> : Awaitable<T> {
      *  to the resulting future.
      *
      * @tparam S  the type of the returned `Future`
-     * @param  s  function that transforms a successful result of the receiver into a successful result of the returned future
-     * @param  f  function that transforms a failure of the receiver into a failure of the returned future
-     * @return    a `Future` that will be completed with the transformed value
+     * @param s function that transforms a successful result of the receiver into a successful result of the returned future
+     * @param f function that transforms a failure of the receiver into a failure of the returned future
+     * @return a `Future` that will be completed with the transformed value
      * @group Transformations
      */
     fun <S> transform(executor: ExecutionContext, s: (T) -> S, f: (Throwable) -> Throwable): Future<S> =
@@ -455,8 +454,8 @@ interface Future<out T> : Awaitable<T> {
      * is applied then that exception will be propagated to the resulting future.
      *
      * @tparam S  the type of the returned `Future`
-     * @param  f  function that transforms the result of this future
-     * @return    a `Future` that will be completed with the transformed value
+     * @param f function that transforms the result of this future
+     * @return a `Future` that will be completed with the transformed value
      * @group Transformations
      */
     fun <S> transform(executor: ExecutionContext, f: (Try<T>) -> Try<S>): Future<S>
@@ -466,8 +465,8 @@ interface Future<out T> : Awaitable<T> {
      * is applied then that exception will be propagated to the resulting future.
      *
      * @tparam S  the type of the returned `Future`
-     * @param  f  function that transforms the result of this future
-     * @return    a `Future` that will be completed with the transformed value
+     * @param f function that transforms the result of this future
+     * @return a `Future` that will be completed with the transformed value
      * @group Transformations
      */
     fun <S> transformWith(executor: ExecutionContext, f: (Try<T>) -> Future<S>): Future<S>
@@ -489,8 +488,8 @@ interface Future<out T> : Awaitable<T> {
      *
      *
      * @tparam S  the type of the returned `Future`
-     * @param f   the function which will be applied to the successful result of this `Future`
-     * @return    a `Future` which will be completed with the result of the application of the function
+     * @param f the function which will be applied to the successful result of this `Future`
+     * @return a `Future` which will be completed with the result of the application of the function
      * @group Transformations
      */
     fun <S> map(executor: ExecutionContext, f: (T) -> S): Future<S> = transform(executor) { it.map(f) }
@@ -503,8 +502,8 @@ interface Future<out T> : Awaitable<T> {
      *  $forComprehensionExamples
      *
      * @tparam S  the type of the returned `Future`
-     * @param f   the function which will be applied to the successful result of this `Future`
-     * @return    a `Future` which will be completed with the result of the application of the function
+     * @param f the function which will be applied to the successful result of this `Future`
+     * @return a `Future` which will be completed with the result of the application of the function
      * @group Transformations
      */
     fun <S> flatMap(executor: ExecutionContext, f: (T) -> Future<S>): Future<S> = transformWith(executor) {
@@ -537,8 +536,8 @@ interface Future<out T> : Awaitable<T> {
      *  Await.result(h, Duration.Zero) // throw a NoSuchElementException
      *  }}}
      *
-     * @param p   the predicate to apply to the successful result of this `Future`
-     * @return    a `Future` which will hold the successful result of this `Future` if it matches the predicate or a `NoSuchElementException`
+     * @param p the predicate to apply to the successful result of this `Future`
+     * @return a `Future` which will hold the successful result of this `Future` if it matches the predicate or a `NoSuchElementException`
      * @group Transformations
      */
     fun filter(executor: ExecutionContext, p: (T) -> Boolean): Future<T> = map(executor) { r ->
@@ -571,8 +570,8 @@ interface Future<out T> : Awaitable<T> {
      *  }}}
      *
      * @tparam S    the type of the returned `Future`
-     * @param pf    the `PartialFunction` to apply to the successful result of this `Future`
-     * @return      a `Future` holding the result of application of the `PartialFunction` or a `NoSuchElementException`
+     * @param pf the `PartialFunction` to apply to the successful result of this `Future`
+     * @return a `Future` holding the result of application of the `PartialFunction` or a `NoSuchElementException`
      * @group Transformations
      */
     fun <S> collect(executor: ExecutionContext, pf: PartialFunction<T, S>): Future<S> = map(executor) { r ->
@@ -636,13 +635,11 @@ interface Future<out T> : Awaitable<T> {
      *  with the throwable stored in `that`.
      *
      * @tparam U      the type of the other `Future`
-     * @param that    the other `Future`
-     * @return        a `Future` with the results of both futures or the failure of the first of them that failed
+     * @param that the other `Future`
+     * @return a `Future` with the results of both futures or the failure of the first of them that failed
      * @group Transformations
      */
-    fun <U> zip(that: Future<U>): Future<Tuple2<T, U>> {
-        return flatMap(InternalCallbackExecutor) { r1: T -> that.map(InternalCallbackExecutor) { r2: U -> Tuple2(r1, r2) } }
-    }
+    fun <U> zip(that: Future<U>): Future<Tuple2<T, U>> = flatMap(InternalCallbackExecutor) { r1: T -> that.map(InternalCallbackExecutor) { r2: U -> Tuple2(r1, r2) } }
 
     /** Zips the values of `this` and `that` future using a function `f`,
      *  and creates a new future holding the result.
@@ -656,9 +653,9 @@ interface Future<out T> : Awaitable<T> {
      *
      * @tparam U      the type of the other `Future`
      * @tparam R      the type of the resulting `Future`
-     * @param that    the other `Future`
-     * @param f       the function to apply to the results of `this` and `that`
-     * @return        a `Future` with the result of the application of `f` to the results of `this` and `that`
+     * @param that the other `Future`
+     * @param f the function to apply to the results of `this` and `that`
+     * @return a `Future` with the result of the application of `f` to the results of `this` and `that`
      * @group Transformations
      */
     fun <U, R> zipWith(that: Future<U>, f: (T, U) -> R): Future<R> =
@@ -735,8 +732,8 @@ interface Future<out T> : Awaitable<T> {
      * $swallowsExceptions
      *
      * @tparam U     only used to accept any return type of the given `PartialFunction`
-     * @param pf     a `PartialFunction` which will be conditionally applied to the outcome of this `Future`
-     * @return       a `Future` which will be completed with the exact same outcome as this `Future` but after the `PartialFunction` has been executed.
+     * @param pf a `PartialFunction` which will be conditionally applied to the outcome of this `Future`
+     * @return a `Future` which will be completed with the exact same outcome as this `Future` but after the `PartialFunction` has been executed.
      * @group Callbacks
      */
     fun <U> andThen(executor: ExecutionContext, pf: PartialFunction<Try<T>, U>): Future<T> =

@@ -18,13 +18,13 @@ interface Awaitable<out T> {
      *
      * '''''This method should not be called directly; use [[Await.ready]] instead.'''''
      *
-     * @param  atMost
+     * @param atMost
      *         maximum wait time, which may be negative (no waiting is done),
      *         [[scala.concurrent.duration.Duration.Inf Duration.Inf]] for unbounded waiting, or a finite positive
      *         duration
      * @return this `Awaitable`
-     * @throws InterruptedException     if the current thread is interrupted while waiting
-     * @throws TimeoutException         if after waiting for the specified time this `Awaitable` is still not ready
+     * @throws InterruptedException if the current thread is interrupted while waiting
+     * @throws TimeoutException if after waiting for the specified time this `Awaitable` is still not ready
      * @throws IllegalArgumentException if `atMost` is [[scala.concurrent.duration.Duration.Undefined Duration.Undefined]]
      */
     @Throws(TimeoutException::class, InterruptedException::class)
@@ -35,13 +35,13 @@ interface Awaitable<out T> {
      *
      * '''''This method should not be called directly; use [[Await.result]] instead.'''''
      *
-     * @param  atMost
+     * @param atMost
      *         maximum wait time, which may be negative (no waiting is done),
      *         [[scala.concurrent.duration.Duration.Inf Duration.Inf]] for unbounded waiting, or a finite positive
      *         duration
      * @return the result value if the `Awaitable` is completed within the specific maximum wait time
-     * @throws InterruptedException     if the current thread is interrupted while waiting
-     * @throws TimeoutException         if after waiting for the specified time this `Awaitable` is still not ready
+     * @throws InterruptedException if the current thread is interrupted while waiting
+     * @throws TimeoutException if after waiting for the specified time this `Awaitable` is still not ready
      * @throws IllegalArgumentException if `atMost` is [[scala.concurrent.duration.Duration.Undefined Duration.Undefined]]
      */
     @Throws(Exception::class)

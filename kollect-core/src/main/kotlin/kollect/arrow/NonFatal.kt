@@ -2,7 +2,6 @@ package kollect.arrow
 
 import kollect.ControlThrowable
 
-
 /**
  * Extractor of non-fatal Throwables. Will not match fatal errors like `VirtualMachineError`
  * (for example, `OutOfMemoryError` and `StackOverflowError`, subclasses of `VirtualMachineError`), `ThreadDeath`,
