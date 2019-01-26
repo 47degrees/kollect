@@ -10,7 +10,9 @@ import arrow.core.Some
 import arrow.core.Tuple2
 import arrow.data.ForNonEmptyList
 import arrow.data.NonEmptyList
+import arrow.effects.Promise
 import arrow.effects.deferred.Deferred
+import arrow.effects.typeclasses.Concurrent
 import arrow.higherkind
 import arrow.typeclasses.Applicative
 import arrow.typeclasses.Traverse
@@ -31,15 +33,17 @@ sealed class Kollect<F, A> : KollectOf<F, A> {
     /**
      * Lift a plain value to the Kollect monad.
      */
-    fun <F, A> just(AF: Applicative<F>, a: A): Kollect<F, A> = Unkollect(AF.just(KollectResult.Done(a)))
+    fun <F, A> just(CF: Concurrent<F>, a: A): Kollect<F, A> = Unkollect(CF.just(KollectResult.Done(a)))
 
-    fun <F, A> exception(AF: Applicative<F>, e: (Env) -> KollectException): Kollect<F, A> = Unkollect(AF.just(KollectResult.Throw(e)))
+    fun <F, A> exception(CF: Concurrent<F>, e: (Env) -> KollectException): Kollect<F, A> = Unkollect(CF.just(KollectResult.Throw(e)))
 
-    fun <F, A> error(AF: Applicative<F>, e: Throwable): Kollect<F, A> = exception(AF) { env -> KollectException.UnhandledException(e, env) }
+    fun <F, A> error(CF: Concurrent<F>, e: Throwable): Kollect<F, A> = exception(CF) { env ->
+      KollectException.UnhandledException(e, env)
+    }
 
-    operator fun <F, I, A> invoke(AF: Concurrent<F>, id: I, ds: DataSource<I, A>): Kollect<F, A> =
-      Unkollect(AF.binding {
-        val deferred = Deferred<F, KollectStatus>(AF) as Deferred<F, KollectStatus>
+    operator fun <F, I, A> invoke(CF: Concurrent<F>, id: I, ds: DataSource<I, A>): Kollect<F, A> =
+      Unkollect(CF.binding {
+        val deferred = Promise.unsafeCancelable<F, KollectStatus>(CF)
         val request = KollectQuery.KollectOne(id, ds)
         val result = { a: KollectStatus -> deferred.complete(a) }
         val blocked = BlockedRequest(request, result)
@@ -90,7 +94,7 @@ sealed class Kollect<F, A> : KollectOf<F, A> {
         CS: ContextShift<F>,
         TF: Timer<F>,
         fa: Kollect<F, A>,
-        cache: DataSourceCache = InMemoryCache.empty()
+        cache: DataSourceCache<F> = InMemoryCache.empty()
       ): Kind<F, A> = C.binding {
         val cacheRef = Ref.of(C, cache).bind()
         val result = performRun(TT, P, C, CS, TF, fa, cacheRef, None).bind()

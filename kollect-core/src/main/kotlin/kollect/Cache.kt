@@ -25,12 +25,9 @@ interface DataSourceCache<F> {
   fun <I : Any, A : Any> bulkInsert(
     MF: Monad<F>,
     vs: List<Tuple2<I, A>>,
-    ds: DataSource<I, A>): Kind<F, DataSourceCache<F>> {
-
-    return ListK.foldable().foldLeftM(MF, vs.k(), this) { cache, tuple: Tuple2<I, A> ->
+    ds: DataSource<I, A>): Kind<F, DataSourceCache<F>> = ListK.foldable().foldLeftM(MF, vs.k(), this) { cache, tuple: Tuple2<I, A> ->
       cache.insert(tuple.a, tuple.b, ds)
     }
-  }
 }
 
 /**
