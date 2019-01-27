@@ -78,13 +78,12 @@ sealed class Kollect<F, A> : KollectOf<F, A> {
          */
         fun <F> run(): KollectRunner<F> = KollectRunner()
 
-        class KollectRunner<F> : Any() {
+        class KollectRunner<F> {
             operator fun <A> invoke(
                     CF: Concurrent<F>,
                     TF: Timer<F>,
                     fa: Kollect<F, A>
-            ): Kind<F, A> =
-                    invoke(CF, TF, fa, InMemoryCache.empty(CF))
+            ): Kind<F, A> = invoke(CF, TF, fa, InMemoryCache.empty(CF))
 
             operator fun <A> invoke(
                     CF: Concurrent<F>,
@@ -103,7 +102,7 @@ sealed class Kollect<F, A> : KollectOf<F, A> {
          */
         fun <F> runEnv(): KollectRunnerEnv<F> = KollectRunnerEnv()
 
-        class KollectRunnerEnv<F> : Any() {
+        class KollectRunnerEnv<F> {
             operator fun <A> invoke(
                     CF: Concurrent<F>,
                     TF: Timer<F>,
@@ -131,7 +130,7 @@ sealed class Kollect<F, A> : KollectOf<F, A> {
          */
         fun <F> runCache(): KollectRunnerCache<F> = KollectRunnerCache()
 
-        class KollectRunnerCache<F> : Any() {
+        class KollectRunnerCache<F> {
             operator fun <A> invoke(
                     CF: Concurrent<F>,
                     TF: Timer<F>,
