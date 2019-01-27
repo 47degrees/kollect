@@ -1,0 +1,23 @@
+language: kotlin
+sudo: required
+dist: trusty
+
+jdk:
+  - oraclejdk8
+
+stages:
+  - name: build
+  - name: coverage-report
+    if: branch = master
+  - name: deploy
+    if: branch = master AND type != pull_request
+
+env:
+  global:
+    - JAVA_OPTS="-Xms512m -Xmx1024m"
+
+jobs:
+  include:
+    - stage: build
+      script:
+        - ./gradlew clean build test
