@@ -83,5 +83,15 @@ class KollectTests : AbstractStringSpec() {
 
             res shouldBe Tuple2(1, listOf(0, 1, 2))
         }
+
+        "We can use Kollect as an applicative" {
+            fun <F> kollect(CF: Concurrent<F>): Kollect<F, Int> =
+                    Kollect.monad<F, Int>(CF).map(one(CF, 1), one(CF, 2), one(CF, 3)) { t -> t.a + t.b + t.c }.fix()
+
+            val io = Kollect.run(IO.concurrent(), IO.timer(EmptyCoroutineContext), kollect(IO.concurrent()))
+            val res = io.fix().unsafeRunSync()
+
+            res shouldBe 6
+        }
     }
 }
