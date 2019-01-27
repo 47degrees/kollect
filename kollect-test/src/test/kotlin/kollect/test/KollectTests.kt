@@ -1,7 +1,6 @@
 package kollect.test
 
 import arrow.core.Tuple2
-import arrow.effects.ForIO
 import arrow.effects.IO
 import arrow.effects.extensions.io.concurrent.concurrent
 import arrow.effects.fix
@@ -25,13 +24,13 @@ class KollectTests : AbstractStringSpec() {
             fun <F> kollect(CF: Concurrent<F>): Kollect<F, Int> =
                     Kollect.just(CF, 42)
 
-            val io = Kollect.run<ForIO>()(IO.concurrent(), IO.timer(EmptyCoroutineContext), kollect(IO.concurrent()))
+            val io = Kollect.run(IO.concurrent(), IO.timer(EmptyCoroutineContext), kollect(IO.concurrent()))
             val res = io.fix().unsafeRunSync()
             res shouldBe 42
         }
 
         "We can lift values which have a Data Source to Fetch" {
-            val io = Kollect.run<ForIO>()(IO.concurrent(), IO.timer(EmptyCoroutineContext), one(IO.concurrent(), 1))
+            val io = Kollect.run(IO.concurrent(), IO.timer(EmptyCoroutineContext), one(IO.concurrent(), 1))
             val res = io.fix().unsafeRunSync()
 
             res shouldBe 1
@@ -41,7 +40,7 @@ class KollectTests : AbstractStringSpec() {
             fun <F> kollect(CF: Concurrent<F>): Kollect<F, Int> =
                     one(CF, 1).map(CF) { it + 1 }
 
-            val io = Kollect.run<ForIO>()(IO.concurrent(), IO.timer(EmptyCoroutineContext), kollect(IO.concurrent()))
+            val io = Kollect.run(IO.concurrent(), IO.timer(EmptyCoroutineContext), kollect(IO.concurrent()))
             val res = io.fix().unsafeRunSync()
 
             res shouldBe 2
@@ -55,7 +54,7 @@ class KollectTests : AbstractStringSpec() {
                         Tuple2(o, t)
                     }.fix()
 
-            val io = Kollect.run<ForIO>()(IO.concurrent(), IO.timer(EmptyCoroutineContext), kollect(IO.concurrent()))
+            val io = Kollect.run(IO.concurrent(), IO.timer(EmptyCoroutineContext), kollect(IO.concurrent()))
             val res = io.fix().unsafeRunSync()
 
             res shouldBe Tuple2(1, 2)
@@ -69,7 +68,7 @@ class KollectTests : AbstractStringSpec() {
                         Tuple2(o, m)
                     }.fix()
 
-            val io = Kollect.run<ForIO>()(IO.concurrent(), IO.timer(EmptyCoroutineContext), kollect(IO.concurrent()))
+            val io = Kollect.run(IO.concurrent(), IO.timer(EmptyCoroutineContext), kollect(IO.concurrent()))
             val res = io.fix().unsafeRunSync()
 
             res shouldBe Tuple2(1, listOf(0, 1, 2))
@@ -79,7 +78,7 @@ class KollectTests : AbstractStringSpec() {
             fun <F> kollect(CF: Concurrent<F>): Kollect<F, Tuple2<Int, List<Int>>> =
                     Kollect.monad<F, Int>(CF).tupled(one(CF, 1), many(CF, 3)).fix()
 
-            val io = Kollect.run<ForIO>()(IO.concurrent(), IO.timer(EmptyCoroutineContext), kollect(IO.concurrent()))
+            val io = Kollect.run(IO.concurrent(), IO.timer(EmptyCoroutineContext), kollect(IO.concurrent()))
             val res = io.fix().unsafeRunSync()
 
             res shouldBe Tuple2(1, listOf(0, 1, 2))

@@ -130,82 +130,79 @@ sealed class Kollect<F, A> : KollectOf<F, A> {
         }
 
         /**
-         * Run a [Kollect], the result in the [F] monad.
+         * Runs a [Kollect], returning a result lifted to the [F] context.
          */
-        fun <F> run(): KollectRunner<F> = KollectRunner()
+        fun <F, A> run(
+                CF: Concurrent<F>,
+                TF: Timer<F>,
+                fa: Kollect<F, A>
+        ): Kind<F, A> = run(CF, TF, fa, InMemoryCache.empty(CF))
 
-        class KollectRunner<F> {
-            operator fun <A> invoke(
-                    CF: Concurrent<F>,
-                    TF: Timer<F>,
-                    fa: Kollect<F, A>
-            ): Kind<F, A> = invoke(CF, TF, fa, InMemoryCache.empty(CF))
-
-            operator fun <A> invoke(
-                    CF: Concurrent<F>,
-                    TF: Timer<F>,
-                    fa: Kollect<F, A>,
-                    cache: DataSourceCache<F>
-            ): Kind<F, A> = CF.binding {
-                val cacheRef = Ref.of(cache, CF).bind()
-                val result = performRun(CF, TF, fa, cacheRef, None).bind()
-                result
-            }
+        /**
+         * Runs a [Kollect], returning a result lifted to the [F] context.
+         */
+        fun <F, A> run(
+                CF: Concurrent<F>,
+                TF: Timer<F>,
+                fa: Kollect<F, A>,
+                cache: DataSourceCache<F>
+        ): Kind<F, A> = CF.binding {
+            val cacheRef = Ref.of(cache, CF).bind()
+            val result = performRun(CF, TF, fa, cacheRef, None).bind()
+            result
         }
 
         /**
-         * Run a `Fetch`, the environment and the result in the `F` monad.
+         * Run a [Kollect], returning the environment and the result in the [F] context.
          */
-        fun <F> runEnv(): KollectRunnerEnv<F> = KollectRunnerEnv()
+        fun <F, A> runEnv(
+                CF: Concurrent<F>,
+                TF: Timer<F>,
+                fa: Kollect<F, A>
+        ): Kind<F, Tuple2<Env, A>> =
+                runEnv(CF, TF, fa, InMemoryCache.empty(CF))
 
-        class KollectRunnerEnv<F> {
-            operator fun <A> invoke(
-                    CF: Concurrent<F>,
-                    TF: Timer<F>,
-                    fa: Kollect<F, A>
-            ): Kind<F, Tuple2<Env, A>> =
-                    invoke(CF, TF, fa, InMemoryCache.empty(CF))
+        /**
+         * Run a [Kollect], returning the environment and the result in the [F] context.
+         */
+        fun <F, A> runEnv(
+                CF: Concurrent<F>,
+                TF: Timer<F>,
+                fa: Kollect<F, A>,
+                cache: DataSourceCache<F>
+        ): Kind<F, Tuple2<Env, A>> = CF.binding {
+            val env = Ref.of<F, Env>(KollectEnv(), CF).bind()
+            val cacheRef = Ref.of(cache, CF).bind()
+            val result = performRun(CF, TF, fa, cacheRef, Some(env)).bind()
+            val e = env.get().bind()
 
-            operator fun <A> invoke(
-                    CF: Concurrent<F>,
-                    TF: Timer<F>,
-                    fa: Kollect<F, A>,
-                    cache: DataSourceCache<F>
-            ): Kind<F, Tuple2<Env, A>> = CF.binding {
-                val env = Ref.of<F, Env>(KollectEnv(), CF).bind()
-                val cacheRef = Ref.of(cache, CF).bind()
-                val result = performRun(CF, TF, fa, cacheRef, Some(env)).bind()
-                val e = env.get().bind()
-
-                Tuple2(e, result)
-            }
+            Tuple2(e, result)
         }
 
         /**
-         * Run a `Fetch`, the cache and the result in the `F` monad.
+         * Runs a [Kollect], returning the cache and the result in the [F] context.
          */
-        fun <F> runCache(): KollectRunnerCache<F> = KollectRunnerCache()
+        fun <F, A> runCache(
+                CF: Concurrent<F>,
+                TF: Timer<F>,
+                fa: Kollect<F, A>
+        ): Kind<F, Tuple2<DataSourceCache<F>, A>> =
+                runCache(CF, TF, fa, InMemoryCache.empty(CF))
 
-        class KollectRunnerCache<F> {
-            operator fun <A> invoke(
-                    CF: Concurrent<F>,
-                    TF: Timer<F>,
-                    fa: Kollect<F, A>
-            ): Kind<F, Tuple2<DataSourceCache<F>, A>> =
-                    invoke(CF, TF, fa, InMemoryCache.empty(CF))
+        /**
+         * Runs a [Kollect], returning the cache and the result in the [F] context.
+         */
+        fun <F, A> runCache(
+                CF: Concurrent<F>,
+                TF: Timer<F>,
+                fa: Kollect<F, A>,
+                cache: DataSourceCache<F>
+        ): Kind<F, Tuple2<DataSourceCache<F>, A>> = CF.binding {
+            val cacheRef = Ref.of(cache, CF).bind()
+            val result = performRun(CF, TF, fa, cacheRef, None).bind()
+            val c = cacheRef.get().bind()
 
-            operator fun <A> invoke(
-                    CF: Concurrent<F>,
-                    TF: Timer<F>,
-                    fa: Kollect<F, A>,
-                    cache: DataSourceCache<F>
-            ): Kind<F, Tuple2<DataSourceCache<F>, A>> = CF.binding {
-                val cacheRef = Ref.of(cache, CF).bind()
-                val result = performRun(CF, TF, fa, cacheRef, None).bind()
-                val c = cacheRef.get().bind()
-
-                Tuple2(c, result)
-            }
+            Tuple2(c, result)
         }
 
         // Data fetching

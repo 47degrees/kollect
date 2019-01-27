@@ -31,7 +31,7 @@ class KollectAsyncQueryTests : AbstractStringSpec() {
         "We can interpret an async fetch into an IO" {
             fun kollect(): Kollect<ForIO, Article> = article(IO.concurrent(), 1)
 
-            val io = Kollect.run<ForIO>()(IO.concurrent(), IO.timer(EmptyCoroutineContext), kollect())
+            val io = Kollect.run(IO.concurrent(), IO.timer(EmptyCoroutineContext), kollect())
             val res = io.fix().unsafeRunSync()
             res shouldBe Article(1, "An article with id 1")
         }
@@ -44,7 +44,7 @@ class KollectAsyncQueryTests : AbstractStringSpec() {
                         Tuple2(art, author)
                     }.fix()
 
-            val io = Kollect.run<ForIO>()(IO.concurrent(), IO.timer(EmptyCoroutineContext), kollect(IO.concurrent()))
+            val io = Kollect.run(IO.concurrent(), IO.timer(EmptyCoroutineContext), kollect(IO.concurrent()))
             val res = io.fix().unsafeRunSync()
 
             res shouldBe Tuple2(Article(1, "An article with id 1"), Author(2, "@egg2"))
