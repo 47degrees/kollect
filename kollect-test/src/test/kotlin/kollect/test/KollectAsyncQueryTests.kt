@@ -15,8 +15,8 @@ import io.kotlintest.specs.AbstractStringSpec
 import kollect.DataSource
 import kollect.Kollect
 import kollect.extensions.io.timer.timer
-import kollect.extensions.kollect.monad.flatMap
-import kollect.extensions.kollect.monad.map
+import kollect.extensions.kollect.monad.monad
+import kollect.fix
 import kollect.test.DataSources.Article
 import kollect.test.DataSources.Author
 import kollect.test.DataSources.article
@@ -38,17 +38,11 @@ class KollectAsyncQueryTests : AbstractStringSpec() {
 
         "We can combine several async data sources and interpret a fetch into an IO" {
             fun <F> kollect(CF: Concurrent<F>): Kollect<F, Tuple2<Article, Author>> =
-                    article(CF, 1).flatMap<F, String, Article, Tuple2<Article, Author>>(CF) { art ->
-                        author(CF, art).map<F, String, Author, Tuple2<Article, Author>>(CF) { author ->
-                            Tuple2(art, author)
-                        }
-                    }
-
-//            CF.binding {
-//                val art = article(CF, 1).bind()
-//                val author = author(CF, art).bind()
-//                Tuple2(art, author)
-//            }
+                    Kollect.monad<F, Int>(CF).binding {
+                        val art = article(CF, 1).bind()
+                        val author = author(CF, art).bind()
+                        Tuple2(art, author)
+                    }.fix()
 
             val io = Kollect.run<ForIO>()(IO.concurrent(), IO.timer(EmptyCoroutineContext), kollect(IO.concurrent()))
             val res = io.fix().unsafeRunSync()
