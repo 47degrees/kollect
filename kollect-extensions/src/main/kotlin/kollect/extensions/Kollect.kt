@@ -18,15 +18,7 @@ interface KollectMonad<F, I> : Monad<KollectPartialOf<F>> {
     override fun <A> just(a: A): Kollect<F, A> = Kollect.Unkollect(MF().just(KollectResult.Done(a)))
 
     override fun <A, B> Kind<KollectPartialOf<F>, A>.map(f: (A) -> B): Kollect<F, B> =
-            Kollect.Unkollect(MF().binding {
-                val kollect = this@map.fix().run.bind()
-                val result = when (kollect) {
-                    is Done -> Done<F, B>(f(kollect.x))
-                    is Blocked -> Blocked(kollect.rs, kollect.cont.map(f))
-                    is Throw -> Throw(kollect.e)
-                }
-                result
-            })
+            fix().map(MF(), f)
 
     override fun <A, B> Kind<KollectPartialOf<F>, A>.product(fb: Kind<KollectPartialOf<F>, B>): Kollect<F, Tuple2<A, B>> =
             Unkollect(MF().binding {

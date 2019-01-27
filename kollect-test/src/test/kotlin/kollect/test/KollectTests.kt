@@ -11,7 +11,6 @@ import io.kotlintest.shouldBe
 import io.kotlintest.specs.AbstractStringSpec
 import kollect.Kollect
 import kollect.extensions.io.timer.timer
-import kollect.extensions.kollect.monad.map
 import kollect.extensions.kollect.monad.monad
 import kollect.fix
 import kollect.test.TestHelper.many
@@ -40,7 +39,7 @@ class KollectTests : AbstractStringSpec() {
 
         "We can map over Kollect values" {
             fun <F> kollect(CF: Concurrent<F>): Kollect<F, Int> =
-                one(CF, 1).map<F, Int, Int, Int>(CF) { it + 1 }
+                    one(CF, 1).map(CF) { it + 1 }
 
             val io = Kollect.run<ForIO>()(IO.concurrent(), IO.timer(EmptyCoroutineContext), kollect(IO.concurrent()))
             val res = io.fix().unsafeRunSync()

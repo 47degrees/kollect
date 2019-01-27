@@ -52,7 +52,7 @@ data class BlockedRequest<F>(val request: KollectRequest, val result: (KollectSt
 /* A map from data sources to blocked requests used to group requests to the same data source. */
 data class RequestMap<F>(val m: Map<DataSource<Any, Any>, BlockedRequest<F>>)
 
-// `Kollect` result data type
+// [Kollect] result data type
 sealed class KollectResult<F, A> {
     data class Done<F, A>(val x: A) : KollectResult<F, A>()
     data class Blocked<F, A>(val rs: RequestMap<F>, val cont: Kollect<F, A>) : KollectResult<F, A>()

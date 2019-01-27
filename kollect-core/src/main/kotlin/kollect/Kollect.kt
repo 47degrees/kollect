@@ -10,6 +10,7 @@ import arrow.effects.Ref
 import arrow.effects.typeclasses.Concurrent
 import arrow.higherkind
 import arrow.typeclasses.Applicative
+import arrow.typeclasses.Monad
 import kollect.typeclasses.Timer
 import java.util.concurrent.TimeUnit
 
@@ -20,6 +21,17 @@ sealed class Kollect<F, A> : KollectOf<F, A> {
     abstract val run: arrow.Kind<F, KollectResult<F, A>>
 
     data class Unkollect<F, A>(override val run: arrow.Kind<F, KollectResult<F, A>>) : Kollect<F, A>()
+
+    fun <B> map(MF: Monad<F>, f: (A) -> B): Kollect<F, B> =
+            Kollect.Unkollect(MF.binding {
+                val kollect = run.bind()
+                val result = when (kollect) {
+                    is KollectResult.Done -> KollectResult.Done<F, B>(f(kollect.x))
+                    is KollectResult.Blocked -> KollectResult.Blocked(kollect.rs, kollect.cont.map(MF, f))
+                    is KollectResult.Throw -> KollectResult.Throw(kollect.e)
+                }
+                result
+            })
 
     companion object {
         /**
