@@ -8,6 +8,7 @@ buildscript {
         kotlinxCoroutinesVersion = '1.1.0'
         kotlinxCollectionsImmutableVersion = '0.1'
         arrowVersion = '0.9.0-SNAPSHOT'
+        kotlinTestVersion = '3.1.5'
     }
 
     repositories {

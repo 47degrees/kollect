@@ -5,6 +5,8 @@ import arrow.core.Tuple2
 import arrow.core.right
 import arrow.core.some
 import arrow.data.*
+import arrow.effects.ForIO
+import arrow.effects.IO
 import arrow.extension
 import arrow.typeclasses.Applicative
 import arrow.typeclasses.Functor
@@ -84,4 +86,13 @@ interface KleisliClock<F, R> : Clock<KleisliPartialOf<F, R>> {
 
     override fun monotonic(unit: TimeUnit): Kind<KleisliPartialOf<F, R>, Long> =
             Kleisli { clock().monotonic(unit) }
+}
+
+@extension
+interface IOClock : Clock<ForIO> {
+    override fun realTime(unit: TimeUnit): IO<Long> =
+            IO { unit.convert(System.currentTimeMillis(), TimeUnit.MILLISECONDS) }
+
+    override fun monotonic(unit: TimeUnit): IO<Long> =
+            IO { unit.convert(System.nanoTime(), TimeUnit.NANOSECONDS) }
 }

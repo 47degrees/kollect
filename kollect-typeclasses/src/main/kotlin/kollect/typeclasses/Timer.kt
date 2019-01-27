@@ -1,5 +1,7 @@
 package kollect.typeclasses
 
+import arrow.effects.typeclasses.Duration
+
 /**
  * Timer is a scheduler of tasks.
  *
@@ -48,7 +50,7 @@ interface Timer<F> {
      * boundary, even if the provided `timespan` is less or
      * equal to zero.
      */
-    fun sleep(duration: FiniteDuration): arrow.Kind<F, Unit>
+    fun sleep(duration: Duration): arrow.Kind<F, Unit>
 
     companion object
 }

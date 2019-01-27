@@ -3,4 +3,5 @@ rootProject.name = 'kollect'
 include ':kollect-core'
 include ':kollect-extensions'
 include ':kollect-typeclasses'
+include ':kollect-test'
 

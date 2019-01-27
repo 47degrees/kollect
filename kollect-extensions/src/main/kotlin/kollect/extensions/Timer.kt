@@ -4,13 +4,17 @@ import arrow.core.Tuple2
 import arrow.core.right
 import arrow.core.some
 import arrow.data.*
+import arrow.effects.ForIO
+import arrow.effects.IO
+import arrow.effects.internal.ForwardCancelable
+import arrow.effects.typeclasses.Duration
 import arrow.extension
 import arrow.typeclasses.Applicative
 import arrow.typeclasses.Functor
 import arrow.typeclasses.Monoid
 import kollect.typeclasses.Clock
-import kollect.typeclasses.FiniteDuration
 import kollect.typeclasses.Timer
+import kotlin.coroutines.CoroutineContext
 
 @extension
 interface EitherTTimer<F, L> : Timer<EitherTPartialOf<F, L>> {
@@ -26,7 +30,7 @@ interface EitherTTimer<F, L> : Timer<EitherTPartialOf<F, L>> {
         override fun FF(): Functor<F> = FF()
     }
 
-    override fun sleep(duration: FiniteDuration): EitherT<F, L, Unit> = FF().run {
+    override fun sleep(duration: Duration): EitherT<F, L, Unit> = FF().run {
         EitherT(TF().sleep(duration).map { it.right() })
     }
 }
@@ -45,7 +49,7 @@ interface OptionTTimer<F> : Timer<OptionTPartialOf<F>> {
         override fun clock(): Clock<F> = CF()
     }
 
-    override fun sleep(duration: FiniteDuration): OptionT<F, Unit> = FF().run {
+    override fun sleep(duration: Duration): OptionT<F, Unit> = FF().run {
         OptionT(TF().sleep(duration).map { it.some() })
     }
 }
@@ -69,7 +73,7 @@ interface WriterTTimer<F, L> : Timer<WriterTPartialOf<F, L>> {
         override fun clock(): Clock<F> = CF()
     }
 
-    override fun sleep(duration: FiniteDuration): WriterT<F, L, Unit> = AF().run {
+    override fun sleep(duration: Duration): WriterT<F, L, Unit> = AF().run {
         WriterT(TF().sleep(duration).map { v -> Tuple2(ML().empty(), v) })
     }
 }
@@ -85,6 +89,21 @@ interface KleisliTimer<F, R> : Timer<KleisliPartialOf<F, R>> {
         override fun clock(): Clock<F> = CF()
     }
 
-    override fun sleep(duration: FiniteDuration): Kleisli<F, R, Unit> =
+    override fun sleep(duration: Duration): Kleisli<F, R, Unit> =
             Kleisli { TF().sleep(duration) }
+}
+
+@extension
+interface IOTimer : Timer<ForIO> {
+
+    fun ec(): CoroutineContext
+
+    override fun clock(): Clock<ForIO> = object : IOClock {}
+
+    override fun sleep(duration: Duration): IO<Unit> =
+            IO.async { conn, cb ->
+                val ref = ForwardCancelable()
+                conn.push(ref.cancel())
+                IO { cb(Unit.right()) }.unsafeRunTimed(duration)
+            }
 }
