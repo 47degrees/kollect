@@ -6,10 +6,8 @@ import arrow.core.Tuple2
 import arrow.extension
 import arrow.typeclasses.Monad
 import kollect.Kollect
-import kollect.Kollect.Unkollect
 import kollect.KollectPartialOf
 import kollect.KollectResult
-import kollect.KollectResult.*
 import kollect.fix
 
 // Kollect ops
@@ -35,12 +33,6 @@ interface KollectMonad<F, I> : Monad<KollectPartialOf<F>> {
             }.fix()
 
     override fun <A, B> Kind<KollectPartialOf<F>, A>.flatMap(f: (A) -> Kind<KollectPartialOf<F>, B>): Kollect<F, B> = MF().run {
-        Unkollect(this@flatMap.fix().run.flatMap {
-            when (it) {
-                is Done -> f(it.x).fix().run
-                is Throw -> MF().just(Throw(it.e))
-                is Blocked -> MF().just(Blocked(it.rs, it.cont.flatMap(f)))
-            }
-        })
+        fix().flatMap(MF(), f)
     }
 }

@@ -58,6 +58,16 @@ sealed class Kollect<F, A> : KollectOf<F, A> {
                 result
             })
 
+    fun <B> flatMap(MF: Monad<F>, f: (A) -> Kind<KollectPartialOf<F>, B>): Kollect<F, B> = MF.run {
+        Unkollect(run.flatMap {
+            when (it) {
+                is KollectResult.Done -> f(it.x).fix().run
+                is KollectResult.Throw -> MF.just(KollectResult.Throw(it.e))
+                is KollectResult.Blocked -> MF.just(KollectResult.Blocked(it.rs, it.cont.flatMap(MF, f)))
+            }
+        })
+    }
+
     companion object {
         /**
          * Lift a plain value to the Kollect monad.
