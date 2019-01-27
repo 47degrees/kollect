@@ -13,7 +13,7 @@ import kollect.KollectStatus.KollectDone
 import kollect.KollectStatus.KollectMissing
 
 /**
- * Combines the identities of two `KollectQuery` to the same data source.
+ * Combines the identities of two [KollectQuery] to the same data source.
  */
 private fun <I, A> combineIdentities(x: KollectQuery<I, A>, y: KollectQuery<I, A>): NonEmptyList<I> =
         y.identities.foldLeft(x.identities) { acc, i ->
@@ -101,8 +101,10 @@ private fun <I, A, F> combineRequests(MF: Monad<F>, x: BlockedRequest<F>, y: Blo
     }
 }
 
-/* Combine two `RequestMap` instances to batch requests to the same data source. */
-fun <I, A, F> combineRequestMaps(MF: Monad<F>, x: RequestMap<F>, y: RequestMap<F>): RequestMap<F> =
+/**
+ * Combine two [RequestMap] instances to batch requests to the same data source.
+ */
+internal fun <I, A, F> combineRequestMaps(MF: Monad<F>, x: RequestMap<F>, y: RequestMap<F>): RequestMap<F> =
         RequestMap(x.m.foldLeft(y.m) { acc, tuple ->
             val combinedReq: BlockedRequest<F> = acc[tuple.key].toOption().fold({ tuple.value }, { combineRequests<I, A, F>(MF, tuple.value, it) })
             acc.updated(tuple.key, combinedReq)
