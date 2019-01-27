@@ -25,12 +25,7 @@ interface KollectMonad<F, I> : Monad<KollectPartialOf<F>> {
             fix().product<I, B>(MF(), fb)
 
     override fun <A, B> tailRecM(a: A, f: (A) -> Kind<KollectPartialOf<F>, Either<A, B>>): Kollect<F, B> =
-            f(a).flatMap {
-                when (it) {
-                    is Either.Left -> tailRecM(a, f)
-                    is Either.Right -> just(it.b)
-                }
-            }.fix()
+            Kollect.tailRecM(MF(), a, f)
 
     override fun <A, B> Kind<KollectPartialOf<F>, A>.flatMap(f: (A) -> Kind<KollectPartialOf<F>, B>): Kollect<F, B> = MF().run {
         fix().flatMap(MF(), f)

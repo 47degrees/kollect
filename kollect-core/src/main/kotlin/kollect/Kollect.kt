@@ -120,6 +120,15 @@ sealed class Kollect<F, A> : KollectOf<F, A> {
                     ))
                 })
 
+        fun <F, A, B> tailRecM(MF: Monad<F>, a: A, f: (A) -> Kind<KollectPartialOf<F>, Either<A, B>>): Kollect<F, B> = MF.run {
+            f(a).fix().flatMap(MF) {
+                when (it) {
+                    is Either.Left -> tailRecM(MF, a, f)
+                    is Either.Right -> just(MF, it.b)
+                }
+            }
+        }
+
         /**
          * Run a [Kollect], the result in the [F] monad.
          */
