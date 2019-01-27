@@ -9,6 +9,7 @@ import arrow.effects.Promise
 import arrow.effects.Ref
 import arrow.effects.typeclasses.Concurrent
 import arrow.higherkind
+import arrow.typeclasses.Applicative
 import kollect.typeclasses.Timer
 import java.util.concurrent.TimeUnit
 
@@ -24,11 +25,11 @@ sealed class Kollect<F, A> : KollectOf<F, A> {
         /**
          * Lift a plain value to the Kollect monad.
          */
-        fun <F, A> just(CF: Concurrent<F>, a: A): Kollect<F, A> = Unkollect(CF.just(KollectResult.Done(a)))
+        fun <F, A> just(AF: Applicative<F>, a: A): Kollect<F, A> = Unkollect(AF.just(KollectResult.Done(a)))
 
-        fun <F, A> exception(CF: Concurrent<F>, e: (Env) -> KollectException): Kollect<F, A> = Unkollect(CF.just(KollectResult.Throw(e)))
+        fun <F, A> exception(AF: Applicative<F>, e: (Env) -> KollectException): Kollect<F, A> = Unkollect(AF.just(KollectResult.Throw(e)))
 
-        fun <F, A> error(CF: Concurrent<F>, e: Throwable): Kollect<F, A> = exception(CF) { env ->
+        fun <F, A> error(AF: Applicative<F>, e: Throwable): Kollect<F, A> = exception(AF) { env ->
             KollectException.UnhandledException(e, env)
         }
 
