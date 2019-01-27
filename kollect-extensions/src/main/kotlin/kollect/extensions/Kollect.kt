@@ -5,9 +5,12 @@ import arrow.core.Either
 import arrow.core.Tuple2
 import arrow.extension
 import arrow.typeclasses.Monad
-import kollect.*
+import kollect.Kollect
 import kollect.Kollect.Unkollect
+import kollect.KollectPartialOf
+import kollect.KollectResult
 import kollect.KollectResult.*
+import kollect.fix
 
 // Kollect ops
 @extension
@@ -21,21 +24,7 @@ interface KollectMonad<F, I> : Monad<KollectPartialOf<F>> {
             fix().map(MF(), f)
 
     override fun <A, B> Kind<KollectPartialOf<F>, A>.product(fb: Kind<KollectPartialOf<F>, B>): Kollect<F, Tuple2<A, B>> =
-            Unkollect(MF().binding {
-                val fab = MF().run { tupled(this@product.fix().run, fb.fix().run).bind() }
-                val first = fab.a
-                val second = fab.b
-                val result = when {
-                    first is Throw -> Throw<F, Tuple2<A, B>>(first.e)
-                    first is Done && second is Done -> Done(Tuple2(first.x, second.x))
-                    first is Done && second is Blocked -> Blocked(second.rs, this@product.product(second.cont))
-                    first is Blocked && second is Done -> Blocked(first.rs, first.cont.product(fb))
-                    first is Blocked && second is Blocked -> Blocked(combineRequestMaps<I, A, F>(MF(), first.rs, second.rs), first.cont.product(second.cont))
-                    // second is Throw
-                    else -> Throw((second as Throw).e)
-                }
-                result
-            })
+            fix().product<I, B>(MF(), fb)
 
     override fun <A, B> tailRecM(a: A, f: (A) -> Kind<KollectPartialOf<F>, Either<A, B>>): Kollect<F, B> =
             f(a).flatMap {

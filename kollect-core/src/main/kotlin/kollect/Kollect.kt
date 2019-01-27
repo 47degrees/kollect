@@ -33,6 +33,31 @@ sealed class Kollect<F, A> : KollectOf<F, A> {
                 result
             })
 
+    fun <I, B> product(MF: Monad<F>, fb: Kind<KollectPartialOf<F>, B>): Kollect<F, Tuple2<A, B>> =
+            Unkollect(MF.binding {
+                val fab = MF.tupled(run, fb.fix().run).bind()
+                val first = fab.a
+                val second = fab.b
+                val result = when {
+                    first is KollectResult.Throw ->
+                        KollectResult.Throw<F, Tuple2<A, B>>(first.e)
+                    first is KollectResult.Done && second is KollectResult.Done ->
+                        KollectResult.Done(Tuple2(first.x, second.x))
+                    first is KollectResult.Done && second is KollectResult.Blocked ->
+                        KollectResult.Blocked(second.rs, product<I, B>(MF, second.cont))
+                    first is KollectResult.Blocked && second is KollectResult.Done ->
+                        KollectResult.Blocked(first.rs, first.cont.product<I, B>(MF, fb))
+                    first is KollectResult.Blocked && second is KollectResult.Blocked ->
+                        KollectResult.Blocked(
+                                combineRequestMaps<I, A, F>(MF, first.rs, second.rs),
+                                first.cont.product<I, B>(MF, second.cont))
+                    // second is Throw
+                    else ->
+                        KollectResult.Throw((second as KollectResult.Throw).e)
+                }
+                result
+            })
+
     companion object {
         /**
          * Lift a plain value to the Kollect monad.
