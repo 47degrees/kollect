@@ -3,6 +3,7 @@ package kollect.test
 import arrow.Kind
 import arrow.core.Tuple2
 import arrow.data.ForListK
+import arrow.data.ListK
 import arrow.data.extensions.list.traverse.sequence
 import arrow.data.extensions.list.traverse.traverse
 import arrow.data.fix
@@ -161,6 +162,40 @@ class KollectTests : AbstractStringSpec() {
             val res = io.fix().unsafeRunSync()
 
             res shouldBe listOf(1, 2, 3)
+        }
+
+        // Execution model
+
+        "Monadic bind implies sequential execution" {
+            fun <F> kollect(CF: Concurrent<F>): Kollect<F, Tuple2<Int, Int>> =
+                    Kollect.monad<F, Int>(CF).binding {
+                        val o = one(CF, 1).bind()
+                        val t = one(CF, 2).bind()
+                        Tuple2(o, t)
+                    }.fix()
+
+            val io = Kollect.runEnv(IO.concurrent(), IO.timer(EmptyCoroutineContext), kollect(IO.concurrent()))
+            val res = io.fix().unsafeRunSync()
+
+            res.a.rounds.size shouldBe 2
+            res.b shouldBe Tuple2(1, 2)
+        }
+
+        "Traversals are implicitly batched" {
+            fun <F> kollect(CF: Concurrent<F>): Kollect<F, Kind<ForListK, Int>> {
+                val monad = Kollect.monad<F, Int>(CF)
+                return monad.binding {
+                    val manies = many(CF, 3).bind()
+                    val ones = manies.traverse(monad) { one(CF, it) }.bind()
+                    ones
+                }.fix()
+            }
+
+            val io = Kollect.runEnv(IO.concurrent(), IO.timer(EmptyCoroutineContext), kollect(IO.concurrent()))
+            val res = io.fix().unsafeRunSync()
+
+            res.a.rounds.size shouldBe 2
+            res.b shouldBe listOf(0, 1, 2)
         }
     }
 }
