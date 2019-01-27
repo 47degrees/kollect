@@ -35,7 +35,7 @@ sealed class Kollect<F, A> : KollectOf<F, A> {
 
         operator fun <F, I, A> invoke(CF: Concurrent<F>, id: I, ds: DataSource<I, A>): Kollect<F, A> =
                 Unkollect(CF.binding {
-                    val deferred = Promise.unsafeCancelable<F, KollectStatus>(CF)
+                    val deferred = Promise<F, KollectStatus>(CF).bind()
                     val request = KollectQuery.KollectOne(id, ds)
                     val result = { a: KollectStatus -> deferred.complete(a) }
                     val blocked = BlockedRequest(request, result)
@@ -56,7 +56,7 @@ sealed class Kollect<F, A> : KollectOf<F, A> {
 
         fun <F, I, A> optional(CF: Concurrent<F>, id: I, ds: DataSource<I, A>): Kollect<F, Option<A>> =
                 Unkollect(CF.binding {
-                    val deferred = Promise.unsafeCancelable<F, KollectStatus>(CF)
+                    val deferred = Promise<F, KollectStatus>(CF).bind()
                     val request = KollectQuery.KollectOne(id, ds)
                     val result = { a: KollectStatus -> deferred.complete(a) }
                     val blocked = BlockedRequest(request, result)
