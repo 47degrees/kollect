@@ -3,7 +3,7 @@ package kollect.test
 import arrow.Kind
 import arrow.core.Tuple2
 import arrow.data.ForListK
-import arrow.data.ListK
+import arrow.data.NonEmptyList
 import arrow.data.extensions.list.traverse.sequence
 import arrow.data.extensions.list.traverse.traverse
 import arrow.data.fix
@@ -13,8 +13,8 @@ import arrow.effects.fix
 import arrow.effects.typeclasses.Concurrent
 import io.kotlintest.runner.junit4.KotlinTestRunner
 import io.kotlintest.shouldBe
-import io.kotlintest.specs.AbstractStringSpec
 import kollect.Kollect
+import kollect.KollectQuery
 import kollect.extensions.io.timer.timer
 import kollect.extensions.kollect.monad.monad
 import kollect.fix
@@ -25,7 +25,7 @@ import org.junit.runner.RunWith
 import kotlin.coroutines.EmptyCoroutineContext
 
 @RunWith(KotlinTestRunner::class)
-class KollectTests : AbstractStringSpec() {
+class KollectTests : KollectSpec() {
     init {
         "We can lift plain values to Fetch" {
             fun <F> kollect(CF: Concurrent<F>): Kollect<F, Int> =
@@ -196,6 +196,43 @@ class KollectTests : AbstractStringSpec() {
 
             res.a.rounds.size shouldBe 2
             res.b shouldBe listOf(0, 1, 2)
+        }
+
+        "Sequencing is implicitly batched" {
+            fun <F> kollect(CF: Concurrent<F>): Kollect<F, Kind<ForListK, Int>> {
+                val monad = Kollect.monad<F, Int>(CF)
+                return listOf(one(CF, 1), one(CF, 2), one(CF, 3)).sequence(monad).fix()
+            }
+
+            val io = Kollect.runEnv(IO.concurrent(), IO.timer(EmptyCoroutineContext), kollect(IO.concurrent()))
+            val res = io.fix().unsafeRunSync()
+
+            val envRounds = res.a.rounds
+            res.b shouldBe listOf(1, 2, 3)
+            envRounds.size shouldBe 1
+            totalFetched(envRounds) shouldBe 3
+            totalBatches(envRounds) shouldBe 1
+        }
+
+        "Identities are deduped when batched" {
+            val sources = listOf(1, 1, 2)
+            fun <F> kollect(CF: Concurrent<F>): Kollect<F, Kind<ForListK, Int>> =
+                    sources.traverse(Kollect.monad<F, Int>(CF)) { one(CF, it) }.fix()
+
+            val io = Kollect.runEnv(IO.concurrent(), IO.timer(EmptyCoroutineContext), kollect(IO.concurrent()))
+            val res = io.fix().unsafeRunSync()
+
+            val result = res.b
+            val envRounds = res.a.rounds
+            val firstRoundQueries = envRounds[0].queries
+            val firstRoundFirstQuery = firstRoundQueries[0]
+
+            result shouldBe sources
+            envRounds.size shouldBe 1
+            firstRoundQueries.size shouldBe 1
+            firstRoundFirstQuery.request shouldBe KollectQuery.Batch(
+                    NonEmptyList(TestHelper.One(1), listOf(TestHelper.One(2))),
+                    (firstRoundFirstQuery.request as KollectQuery.Batch<TestHelper.One, Int>).ds)
         }
     }
 }
