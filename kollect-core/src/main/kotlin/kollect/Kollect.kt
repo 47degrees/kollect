@@ -14,7 +14,6 @@ import arrow.typeclasses.Monad
 import kollect.typeclasses.Timer
 import java.util.concurrent.TimeUnit
 
-// Kollect data type
 @higherkind
 sealed class Kollect<F, A> : KollectOf<F, A> {
 
