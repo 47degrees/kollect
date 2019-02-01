@@ -13,7 +13,7 @@ open class KollectSpec : AbstractStringSpec() {
                 is KollectQuery.Batch<*, *> -> req.ids.size
             }
 
-    fun totalFetched(rs: List<Round>): Int =
+    fun totalKollected(rs: List<Round>): Int =
             rs.map { round: Round -> round.queries.map { countFetches(it) }.sum() }.toList().sum()
 
     fun countBatches(r: Request): Int =

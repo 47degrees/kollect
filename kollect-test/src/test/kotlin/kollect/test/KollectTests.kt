@@ -1,10 +1,7 @@
 package kollect.test
 
 import arrow.Kind
-import arrow.core.Either
-import arrow.core.None
-import arrow.core.Option
-import arrow.core.Tuple2
+import arrow.core.*
 import arrow.data.*
 import arrow.data.extensions.list.traverse.sequence
 import arrow.data.extensions.list.traverse.traverse
@@ -23,6 +20,7 @@ import kollect.KollectException.MissingIdentity
 import kollect.KollectException.UnhandledException
 import kollect.extensions.io.timer.timer
 import kollect.extensions.kollect.monad.monad
+import kollect.extensions.kollect.monad.map
 import kollect.test.TestHelper.AnException
 import kollect.test.TestHelper.Never
 import kollect.test.TestHelper.NeverSource
@@ -39,7 +37,7 @@ import kotlin.coroutines.EmptyCoroutineContext
 @RunWith(KotlinTestRunner::class)
 class KollectTests : KollectSpec() {
     init {
-        "We can lift plain values to Fetch" {
+        "We can lift plain values to Kollect" {
             fun <F> kollect(CF: Concurrent<F>): Kollect<F, Int> =
                     Kollect.just(CF, 42)
 
@@ -48,7 +46,7 @@ class KollectTests : KollectSpec() {
             res shouldBe 42
         }
 
-        "We can lift values which have a Data Source to Fetch" {
+        "We can lift values which have a Data Source to Kollect" {
             val io = Kollect.run(IO.concurrent(), IO.timer(EmptyCoroutineContext), one(IO.concurrent(), 1))
             val res = io.fix().unsafeRunSync()
 
@@ -222,7 +220,7 @@ class KollectTests : KollectSpec() {
             val envRounds = res.a.rounds
             res.b shouldBe listOf(1, 2, 3)
             envRounds.size shouldBe 1
-            totalFetched(envRounds) shouldBe 3
+            totalKollected(envRounds) shouldBe 3
             totalBatches(envRounds) shouldBe 1
         }
 
@@ -247,7 +245,7 @@ class KollectTests : KollectSpec() {
                     (firstRoundFirstQuery.request as KollectQuery.Batch<TestHelper.One, Int>).ds)
         }
 
-        "The product of two fetches implies parallel fetching" {
+        "The product of two kollects implies parallel kollecting" {
             fun <F> kollect(CF: Concurrent<F>): Kollect<F, Tuple2<Int, List<Int>>> {
                 val monad = Kollect.monad<F, Int>(CF)
                 return monad.tupled(one(CF, 1), many(CF, 3)).fix()
@@ -264,7 +262,7 @@ class KollectTests : KollectSpec() {
             envRounds[0].queries.size shouldBe 2
         }
 
-        "Concurrent fetching calls batches only when it can" {
+        "Concurrent kollecting calls batches only when it can" {
             fun <F> kollect(CF: Concurrent<F>): Kollect<F, Tuple2<Int, List<Int>>> {
                 val monad = Kollect.monad<F, Int>(CF)
                 return monad.tupled(one(CF, 1), many(CF, 3)).fix()
@@ -281,7 +279,7 @@ class KollectTests : KollectSpec() {
             totalBatches(envRounds) shouldBe 0
         }
 
-        "Concurrent fetching performs requests to multiple data sources in parallel" {
+        "Concurrent kollecting performs requests to multiple data sources in parallel" {
             fun <F> kollect(CF: Concurrent<F>): Kollect<F, Tuple2<Tuple2<Int, List<Int>>, Int>> {
                 val monad = Kollect.monad<F, Int>(CF)
                 return monad.tupled(monad.tupled(one(CF, 1), many(CF, 2)).fix(), anotherOne(CF, 3)).fix()
@@ -317,7 +315,7 @@ class KollectTests : KollectSpec() {
             result shouldBe Tuple2(Tuple2(1, Tuple2(2, 3)), 4)
             envRounds.size shouldBe 1
             totalBatches(envRounds) shouldBe 1
-            totalFetched(envRounds) shouldBe 4
+            totalKollected(envRounds) shouldBe 4
         }
 
         "The product of concurrent kollects of the same type implies everything kollected in a single batch" {
@@ -355,7 +353,7 @@ class KollectTests : KollectSpec() {
             result shouldBe Tuple2(Tuple2(1, 2), 3)
             envRounds.size shouldBe 2
             totalBatches(envRounds) shouldBe 2
-            totalFetched(envRounds) shouldBe 5
+            totalKollected(envRounds) shouldBe 5
         }
 
         "Every level of joined concurrent kollects is combined and batched" {
@@ -393,7 +391,7 @@ class KollectTests : KollectSpec() {
             result shouldBe Tuple2(1, 2)
             envRounds.size shouldBe 2
             totalBatches(envRounds) shouldBe 2
-            totalFetched(envRounds) shouldBe 4
+            totalKollected(envRounds) shouldBe 4
         }
 
         "Every level of sequenced concurrent kollects is batched" {
@@ -431,7 +429,7 @@ class KollectTests : KollectSpec() {
             result shouldBe Tuple2(Tuple2(listOf(9, 10, 11), listOf(12, 13, 14)), listOf(15, 16, 17))
             envRounds.size shouldBe 3
             totalBatches(envRounds) shouldBe 3
-            totalFetched(envRounds) shouldBe 9 + 4 + 6
+            totalKollected(envRounds) shouldBe 9 + 4 + 6
         }
 
         "The product of two kollects from the same data source implies batching" {
@@ -449,7 +447,7 @@ class KollectTests : KollectSpec() {
             result shouldBe Tuple2(1, 3)
             envRounds.size shouldBe 1
             totalBatches(envRounds) shouldBe 1
-            totalFetched(envRounds) shouldBe 2
+            totalKollected(envRounds) shouldBe 2
         }
 
         "Sequenced kollects are run concurrently" {
@@ -517,7 +515,7 @@ class KollectTests : KollectSpec() {
 
             result shouldBe listOf(1, 2, 1)
             envRounds.size shouldBe 1
-            totalFetched(envRounds) shouldBe 2
+            totalKollected(envRounds) shouldBe 2
         }
 
         "Sources that can be kollected concurrently inside a for comprehension will be" {
@@ -538,7 +536,7 @@ class KollectTests : KollectSpec() {
 
             result shouldBe listOf(1, 2, 1)
             envRounds.size shouldBe 1
-            totalFetched(envRounds) shouldBe 2
+            totalKollected(envRounds) shouldBe 2
         }
 
         "Pure Kollects allow to explore further in the Kollect"  {
@@ -564,7 +562,7 @@ class KollectTests : KollectSpec() {
 
             result shouldBe Tuple2(1, 5)
             envRounds.size shouldBe 1
-            totalFetched(envRounds) shouldBe 2
+            totalKollected(envRounds) shouldBe 2
         }
 
         // Caching
@@ -592,7 +590,7 @@ class KollectTests : KollectSpec() {
             val envRounds = res.a.rounds
 
             result shouldBe 2
-            totalFetched(envRounds) shouldBe 3
+            totalKollected(envRounds) shouldBe 3
         }
 
         "Batched elements are cached and thus not kollected more than once" {
@@ -620,7 +618,7 @@ class KollectTests : KollectSpec() {
 
             result shouldBe 2
             envRounds.size shouldBe 1
-            totalFetched(envRounds) shouldBe 3
+            totalKollected(envRounds) shouldBe 3
         }
 
         "Elements that are cached won't be kollected" {
@@ -655,7 +653,7 @@ class KollectTests : KollectSpec() {
 
             result shouldBe 2
             envRounds.size shouldBe 0
-            totalFetched(envRounds) shouldBe 0
+            totalKollected(envRounds) shouldBe 0
         }
 
         "Kollect#run accepts a cache as the second (optional) parameter" {
@@ -779,7 +777,7 @@ class KollectTests : KollectSpec() {
 
             result shouldBe 2
             envRounds.size shouldBe 7
-            totalFetched(envRounds) shouldBe 7
+            totalKollected(envRounds) shouldBe 7
         }
 
         "We can use a custom cache that discards elements together with concurrent kollects" {
@@ -808,7 +806,7 @@ class KollectTests : KollectSpec() {
 
             result shouldBe 2
             envRounds.size shouldBe 8
-            totalFetched(envRounds) shouldBe 10
+            totalKollected(envRounds) shouldBe 10
         }
 
         // Errors
@@ -954,7 +952,7 @@ class KollectTests : KollectSpec() {
             }.unsafeRunSync()
         }
 
-        "If there are multiple failing identities the fetch will fail" {
+        "If there are multiple failing identities the kollect will fail" {
             fun <F> kollect(CF: Concurrent<F>): Kollect<F, Tuple2<Int, Int>> {
                 val monad = Kollect.monad<F, Int>(CF)
                 return monad.tupled(never(CF), never(CF)).fix()
@@ -974,7 +972,7 @@ class KollectTests : KollectSpec() {
             }.unsafeRunSync()
         }
 
-        // Optional fetches
+        // Optional kollects
 
         data class MaybeMissing(val id: Int)
 
@@ -992,6 +990,34 @@ class KollectTests : KollectSpec() {
         fun <F> maybeOpt(CF: Concurrent<F>, id: Int): Kollect<F, Option<Int>> =
                 Kollect.optional(CF, MaybeMissing(id), MaybeMissingSource())
 
-        
+        "We can run optional kollects" {
+            fun <F> kollect(CF: Concurrent<F>): Kollect<F, Option<Int>> = maybeOpt(CF, 1)
+
+            val cf = IO.concurrent()
+            Kollect.run(cf, IO.timer(EmptyCoroutineContext), kollect(cf)).map {
+                it shouldBe Some(1)
+            }.unsafeRunSync()
+        }
+
+//        "We can run optional kollects with traverse" {
+//            fun <F> kollect(CF: Concurrent<F>): Kollect<F, ListK<Int>> {
+//                val monad = Kollect.monad<F, Int>(CF)
+//                return listOf(1, 2, 3).traverse(Kollect.monad<F, Int>(CF)) { i -> maybeOpt(CF, i) }.fix().map(CF) { it.flatten() }
+//            }
+//
+//            val cf = IO.concurrent()
+//            Kollect.run(cf, IO.timer(EmptyCoroutineContext), kollect(cf)).map {
+//                it shouldBe Some(1)
+//            }.unsafeRunSync()
+//        }
+
+
+        // fun <G, A, B> Kind<F, A>.flatTraverse(MF: Monad<F>, AG: Applicative<G>, f: (A) -> Kind<G, Kind<F, B>>): Kind<G, Kind<F, B>> =
+        //    AG.run { traverse(this, f).map { MF.run { it.flatten() } } }
+
+
+        // List(1, 2, 3).traverse(maybeOpt[F]).map(_.flatten)
+
+        // Fetch.run[IO](fetch).map(_ shouldEqual List(1, 3)).unsafeToFuture
     }
 }
