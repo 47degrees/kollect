@@ -2,11 +2,9 @@ package kollect.test
 
 import arrow.Kind
 import arrow.core.Tuple2
-import arrow.data.ForListK
-import arrow.data.NonEmptyList
+import arrow.data.*
 import arrow.data.extensions.list.traverse.sequence
 import arrow.data.extensions.list.traverse.traverse
-import arrow.data.fix
 import arrow.effects.IO
 import arrow.effects.extensions.io.concurrent.concurrent
 import arrow.effects.fix
@@ -287,7 +285,7 @@ class KollectTests : KollectSpec() {
         }
 
         "The product of concurrent kollects implies everything kollected concurrently" {
-            fun <F> kollect(CF: Concurrent<F>): Kollect<F, Tuple2<Tuple2<Int, Tuple2<Int,Int>>, Int>> {
+            fun <F> kollect(CF: Concurrent<F>): Kollect<F, Tuple2<Tuple2<Int, Tuple2<Int, Int>>, Int>> {
                 val monad = Kollect.monad<F, Int>(CF)
                 val tupled2and3 = monad.tupled(one(CF, 2), one(CF, 3)).fix()
                 val tupled1and2and3 = monad.tupled(one(CF, 1), tupled2and3).fix()
@@ -344,6 +342,82 @@ class KollectTests : KollectSpec() {
             envRounds.size shouldBe 2
             totalBatches(envRounds) shouldBe 2
             totalFetched(envRounds) shouldBe 5
+        }
+
+        "Every level of joined concurrent kollects is combined and batched" {
+            fun <F> aKollect(CF: Concurrent<F>): Kollect<F, Int> {
+                val monad = Kollect.monad<F, Int>(CF)
+                return monad.binding {
+                    val a = one(CF, 1).bind() // round 1
+                    val b = many(CF, 1).bind() // round 2
+                    val c = one(CF, 1).bind()
+                    c
+                }.fix()
+            }
+
+            fun <F> anotherKollect(CF: Concurrent<F>): Kollect<F, Int> {
+                val monad = Kollect.monad<F, Int>(CF)
+                return monad.binding {
+                    val a = one(CF, 2).bind() // round 1
+                    val b = many(CF, 2).bind() // round 2
+                    val c = one(CF, 2).bind()
+                    c
+                }.fix()
+            }
+
+            fun <F> kollect(CF: Concurrent<F>): Kollect<F, Tuple2<Int, Int>> {
+                val monad = Kollect.monad<F, Int>(CF)
+                return monad.tupled(aKollect(CF), anotherKollect(CF)).fix()
+            }
+
+            val io = Kollect.runEnv(IO.concurrent(), IO.timer(EmptyCoroutineContext), kollect(IO.concurrent()))
+            val res = io.fix().unsafeRunSync()
+
+            val result = res.b
+            val envRounds = res.a.rounds
+
+            result shouldBe Tuple2(1, 2)
+            envRounds.size shouldBe 2
+            totalBatches(envRounds) shouldBe 2
+            totalFetched(envRounds) shouldBe 4
+        }
+
+        "Every level of sequenced concurrent kollects is batched" {
+            fun <F> aKollect(CF: Concurrent<F>): Kollect<F, ListK<Int>> {
+                val monad = Kollect.monad<F, Int>(CF)
+                return monad.binding {
+                    val a = listOf(2, 3, 4).k().traverse(monad) { one(CF, it) }.bind() // round 1
+                    val b = listOf(0, 1).k().traverse(monad) { many(CF, it) }.bind() // round 2
+                    val c = listOf(9, 10, 11).k().traverse(monad) { one(CF, it) }.bind() // round 3
+                    c
+                }.fix()
+            }
+
+            fun <F> anotherKollect(CF: Concurrent<F>): Kollect<F, ListK<Int>> {
+                val monad = Kollect.monad<F, Int>(CF)
+                return monad.binding {
+                    val a = listOf(5, 6, 7).k().traverse(monad) { one(CF, it) }.bind() // round 1
+                    val b = listOf(2, 3).k().traverse(monad) { many(CF, it) }.bind() // round 2
+                    val c = listOf(12, 13, 14).k().traverse(monad) { one(CF, it) }.bind() // round 3
+                    c
+                }.fix()
+            }
+
+            fun <F> kollect(CF: Concurrent<F>): Kollect<F, Tuple2<Tuple2<ListK<Int>, ListK<Int>>, ListK<Int>>> {
+                val monad = Kollect.monad<F, Int>(CF)
+                return monad.tupled(monad.tupled(aKollect(CF), anotherKollect(CF)), listOf(15, 16, 17).k().traverse(monad) { one(CF, it)}).fix() // round 1
+            }
+
+            val io = Kollect.runEnv(IO.concurrent(), IO.timer(EmptyCoroutineContext), kollect(IO.concurrent()))
+            val res = io.fix().unsafeRunSync()
+
+            val result = res.b
+            val envRounds = res.a.rounds
+
+            result shouldBe Tuple2(Tuple2(listOf(9, 10, 11), listOf(12, 13, 14)), listOf(15, 16, 17))
+            envRounds.size shouldBe 3
+            totalBatches(envRounds) shouldBe 3
+            totalFetched(envRounds) shouldBe 9 + 4 + 6
         }
     }
 }
