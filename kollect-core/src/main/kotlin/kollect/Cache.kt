@@ -9,9 +9,9 @@ import arrow.data.extensions.listk.foldable.foldable
 import arrow.data.k
 import arrow.typeclasses.Monad
 
-class DataSourceName(val name: String) : Any()
-class DataSourceId(val id: Any) : Any()
-class DataSourceResult(val result: Any) : Any()
+data class DataSourceName(val name: String) : Any()
+data class DataSourceId(val id: Any) : Any()
+data class DataSourceResult(val result: Any) : Any()
 
 /**
  *  Users of Kollect can provide their own cache by implementing this interface.
