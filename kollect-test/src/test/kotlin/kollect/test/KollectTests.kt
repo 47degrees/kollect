@@ -405,7 +405,7 @@ class KollectTests : KollectSpec() {
 
             fun <F> kollect(CF: Concurrent<F>): Kollect<F, Tuple2<Tuple2<ListK<Int>, ListK<Int>>, ListK<Int>>> {
                 val monad = Kollect.monad<F, Int>(CF)
-                return monad.tupled(monad.tupled(aKollect(CF), anotherKollect(CF)), listOf(15, 16, 17).k().traverse(monad) { one(CF, it)}).fix() // round 1
+                return monad.tupled(monad.tupled(aKollect(CF), anotherKollect(CF)), listOf(15, 16, 17).k().traverse(monad) { one(CF, it) }).fix() // round 1
             }
 
             val io = Kollect.runEnv(IO.concurrent(), IO.timer(EmptyCoroutineContext), kollect(IO.concurrent()))
@@ -475,7 +475,7 @@ class KollectTests : KollectSpec() {
         "Traversals are batched" {
             fun <F> kollect(CF: Concurrent<F>): Kollect<F, Kind<ForListK, Int>> {
                 val monad = Kollect.monad<F, Int>(CF)
-                return listOf(1, 2, 3).k().traverse(monad) { one(CF, it)}.fix()
+                return listOf(1, 2, 3).k().traverse(monad) { one(CF, it) }.fix()
             }
 
             val io = Kollect.runEnv(IO.concurrent(), IO.timer(EmptyCoroutineContext), kollect(IO.concurrent()))
@@ -492,7 +492,7 @@ class KollectTests : KollectSpec() {
         "Duplicated sources are only kollected once" {
             fun <F> kollect(CF: Concurrent<F>): Kollect<F, Kind<ForListK, Int>> {
                 val monad = Kollect.monad<F, Int>(CF)
-                return listOf(1, 2, 1).k().traverse(monad) { one(CF, it)}.fix()
+                return listOf(1, 2, 1).k().traverse(monad) { one(CF, it) }.fix()
             }
 
             val io = Kollect.runEnv(IO.concurrent(), IO.timer(EmptyCoroutineContext), kollect(IO.concurrent()))
@@ -525,6 +525,60 @@ class KollectTests : KollectSpec() {
             result shouldBe listOf(1, 2, 1)
             envRounds.size shouldBe 1
             totalFetched(envRounds) shouldBe 2
+        }
+
+        "Pure Kollects allow to explore further in the Kollect"  {
+            fun <F> aKollect(CF: Concurrent<F>): Kollect<F, Int> {
+                val monad = Kollect.monad<F, Int>(CF)
+                return monad.binding {
+                    val a = Kollect.just(CF, 2).bind()
+                    val b = one(CF, 3).bind()
+                    a + b
+                }.fix()
+            }
+
+            fun <F> kollect(CF: Concurrent<F>): Kollect<F, Tuple2<Int, Int>> {
+                val monad = Kollect.monad<F, Int>(CF)
+                return monad.tupled(one(CF, 1), aKollect(CF)).fix()
+            }
+
+            val io = Kollect.runEnv(IO.concurrent(), IO.timer(EmptyCoroutineContext), kollect(IO.concurrent()))
+            val res = io.fix().unsafeRunSync()
+
+            val result = res.b
+            val envRounds = res.a.rounds
+
+            result shouldBe Tuple2(1, 5)
+            envRounds.size shouldBe 1
+            totalFetched(envRounds) shouldBe 2
+        }
+
+        // Caching
+
+        "Elements are cached and thus not kollected more than once" {
+            fun <F> kollect(CF: Concurrent<F>): Kollect<F, Int> {
+                val monad = Kollect.monad<F, Int>(CF)
+                return monad.binding {
+                    val aOne = one(CF, 1).bind()
+                    val anotherOne = one(CF, 1).bind()
+                    one(CF, 1).bind()
+                    one(CF, 1).bind()
+                    one(CF, 1).bind()
+                    one(CF, 1).bind()
+                    listOf(1, 2, 3).k().traverse(monad) { one(CF, it) }.bind()
+                    one(CF, 1).bind()
+                    aOne + anotherOne
+                }.fix()
+            }
+
+            val io = Kollect.runEnv(IO.concurrent(), IO.timer(EmptyCoroutineContext), kollect(IO.concurrent()))
+            val res = io.fix().unsafeRunSync()
+
+            val result = res.b
+            val envRounds = res.a.rounds
+
+            result shouldBe 2
+            totalFetched(envRounds) shouldBe 3
         }
     }
 }
