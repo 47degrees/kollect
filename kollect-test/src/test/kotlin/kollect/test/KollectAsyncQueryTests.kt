@@ -4,10 +4,12 @@ import arrow.Kind
 import arrow.core.Option
 import arrow.core.Right
 import arrow.core.Tuple2
-import arrow.effects.ForIO
+import arrow.data.ListK
+import arrow.data.extensions.list.traverse.traverse
+import arrow.data.fix
 import arrow.effects.IO
 import arrow.effects.extensions.io.concurrent.concurrent
-import arrow.effects.fix
+import arrow.effects.extensions.io.functor.map
 import arrow.effects.typeclasses.Concurrent
 import io.kotlintest.runner.junit4.KotlinTestRunner
 import io.kotlintest.shouldBe
@@ -29,15 +31,14 @@ import kotlin.coroutines.EmptyCoroutineContext
 class KollectAsyncQueryTests : AbstractStringSpec() {
     init {
 
-        "We can interpret an async fetch into an IO" {
-            fun kollect(): Kollect<ForIO, Article> = article(IO.concurrent(), 1)
+        "We can interpret an async kollect into an IO" {
+            fun <F> kollect(CF: Concurrent<F>): Kollect<F, Article> = article(CF, 1)
 
-            val io = Kollect.run(IO.concurrent(), IO.timer(EmptyCoroutineContext), kollect())
-            val res = io.fix().unsafeRunSync()
-            res shouldBe Article(1, "An article with id 1")
+            val io = Kollect.run(IO.concurrent(), IO.timer(EmptyCoroutineContext), kollect(IO.concurrent()))
+            io.map { it shouldBe Article(1, "An article with id 1") }.unsafeRunSync()
         }
 
-        "We can combine several async data sources and interpret a fetch into an IO" {
+        "We can combine several async data sources and interpret a kollect into an IO" {
             fun <F> kollect(CF: Concurrent<F>): Kollect<F, Tuple2<Article, Author>> =
                     Kollect.monad<F, Int>(CF).binding {
                         val art = article(CF, 1).bind()
@@ -46,47 +47,54 @@ class KollectAsyncQueryTests : AbstractStringSpec() {
                     }.fix()
 
             val io = Kollect.run(IO.concurrent(), IO.timer(EmptyCoroutineContext), kollect(IO.concurrent()))
-            val res = io.fix().unsafeRunSync()
+            io.map { it shouldBe Tuple2(Article(1, "An article with id 1"), Author(2, "@egg2")) }.unsafeRunSync()
+        }
 
-            res shouldBe Tuple2(Article(1, "An article with id 1"), Author(2, "@egg2"))
+        "We can use combinators in a for comprehension and interpret a kollect from async sources into an IO" {
+            fun <F> kollect(CF: Concurrent<F>): Kollect<F, List<Article>> {
+                val monad = Kollect.monad<F, Int>(CF)
+                return monad.binding {
+                    val articles = listOf(1, 1, 2).traverse(monad) { article(CF, it) }.bind()
+                    articles.fix()
+                }.fix()
+            }
+
+            val io = Kollect.run(IO.concurrent(), IO.timer(EmptyCoroutineContext), kollect(IO.concurrent()))
+            io.map {
+                it shouldBe listOf(
+                        Article(1, "An article with id 1"),
+                        Article(1, "An article with id 1"),
+                        Article(2, "An article with id 2")
+                )
+            }.unsafeRunSync()
+        }
+
+        "We can use combinators and multiple sources in a for comprehension and interpret a kollect from async sources into an IO" {
+            fun <F> kollect(CF: Concurrent<F>): Kollect<F, Tuple2<ListK<Article>, ListK<Author>>> {
+                val monad = Kollect.monad<F, Int>(CF)
+                return monad.binding {
+                    val articles = listOf(1, 1, 2).traverse(monad) { article(CF, it) }.bind().fix()
+                    val authors = articles.traverse(monad) { author(CF, it) }.bind().fix()
+                    Tuple2(articles, authors)
+                }.fix()
+            }
+
+            val io = Kollect.run(IO.concurrent(), IO.timer(EmptyCoroutineContext), kollect(IO.concurrent()))
+            io.map {
+                it shouldBe Tuple2(
+                        listOf(
+                                Article(1, "An article with id 1"),
+                                Article(1, "An article with id 1"),
+                                Article(2, "An article with id 2")
+                        ),
+                        listOf(
+                                Author(2, "@egg2"),
+                                Author(2, "@egg2"),
+                                Author(3, "@egg3")
+                        ))
+            }.unsafeRunSync()
         }
     }
-//
-//    "We can use combinators in a for comprehension and interpret a fetch from async sources into an IO" in {
-//        def fetch[F[_] : ConcurrentEffect]: Fetch[F, List[Article]] = for {
-//        articles <- List(1, 1, 2).traverse(article[F])
-//    } yield articles
-//
-//        val io = Fetch.run[IO](fetch)
-//
-//        io.map(_ shouldEqual List(
-//                Article(1, "An article with id 1"),
-//                Article(1, "An article with id 1"),
-//                Article(2, "An article with id 2")
-//        )).unsafeToFuture
-//    }
-//
-//    "We can use combinators and multiple sources in a for comprehension and interpret a fetch from async sources into an IO" in {
-//        def fetch[F[_] : ConcurrentEffect] = for {
-//        articles <- List(1, 1, 2).traverse(article[F])
-//        authors  <- articles.traverse(author[F])
-//    } yield (articles, authors)
-//
-//        val io = Fetch.run[IO](fetch)
-//
-//        io.map(_ shouldEqual (
-//                List(
-//                        Article(1, "An article with id 1"),
-//                        Article(1, "An article with id 1"),
-//                        Article(2, "An article with id 2")
-//                ),
-//                List(
-//                        Author(2, "@egg2"),
-//                        Author(2, "@egg2"),
-//                        Author(3, "@egg3")
-//                )
-//        )).unsafeToFuture
-//    }
 }
 
 object DataSources {
