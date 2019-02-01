@@ -20,8 +20,10 @@ import io.kotlintest.runner.junit4.KotlinTestRunner
 import io.kotlintest.shouldBe
 import kollect.*
 import kollect.KollectException.MissingIdentity
+import kollect.KollectException.UnhandledException
 import kollect.extensions.io.timer.timer
 import kollect.extensions.kollect.monad.monad
+import kollect.test.TestHelper.AnException
 import kollect.test.TestHelper.Never
 import kollect.test.TestHelper.NeverSource
 import kollect.test.TestHelper.One
@@ -845,8 +847,150 @@ class KollectTests : KollectSpec() {
             io.map { it shouldBe 1 }.unsafeRunSync()
         }
 
-        fun <F> fetchError(CF: Concurrent<F>): Kollect<F, Int> =
-                Kollect.error(CF, TestHelper.AnException)
+        fun <F> kollectError(CF: Concurrent<F>): Kollect<F, Int> =
+                Kollect.error(CF, AnException)
+
+        "We can lift errors to Kollect" {
+            val cf = IO.concurrent()
+            val io = Kollect.runEnv(cf, IO.timer(EmptyCoroutineContext), kollectError(cf))
+
+            io.attempt().map { attempt ->
+                assertTrue(attempt is Either.Left)
+                when (attempt) {
+                    is Either.Left -> {
+                        assertTrue(attempt.a is NoStackTrace)
+                        assertTrue(attempt.a.message == UnhandledException::class.java.simpleName)
+                    }
+                }
+            }.unsafeRunSync()
+        }
+
+        "We can lift handle and recover from errors in Kollect" {
+            val cf = IO.concurrent()
+            val io = Kollect.run(cf, IO.timer(EmptyCoroutineContext), kollectError(cf))
+
+            io.handleErrorWith { IO.just(42) }
+                    .map { it shouldBe 42 }
+                    .unsafeRunSync()
+        }
+
+        "If a kollect fails in the left hand of a product the product will fail" {
+            fun <F> kollect(CF: Concurrent<F>): Kollect<F, Tuple2<Int, List<Int>>> {
+                val monad = Kollect.monad<F, Int>(CF)
+                return monad.tupled(kollectError(CF), many(CF, 3)).fix()
+            }
+
+            val cf = IO.concurrent()
+            val io = Kollect.run(cf, IO.timer(EmptyCoroutineContext), kollect(cf))
+
+            io.attempt().map { attempt ->
+                assertTrue(attempt is Either.Left)
+                when (attempt) {
+                    is Either.Left -> {
+                        assertTrue(attempt.a is NoStackTrace)
+                        assertTrue(attempt.a.message == UnhandledException::class.java.simpleName)
+                    }
+                }
+            }.unsafeRunSync()
+        }
+
+        "If a kollect fails in the right hand of a product the product will fail" {
+            fun <F> kollect(CF: Concurrent<F>): Kollect<F, Tuple2<List<Int>, Int>> {
+                val monad = Kollect.monad<F, Int>(CF)
+                return monad.tupled(many(CF, 3), kollectError(CF)).fix()
+            }
+
+            val cf = IO.concurrent()
+            val io = Kollect.run(cf, IO.timer(EmptyCoroutineContext), kollect(cf))
+
+            io.attempt().map { attempt ->
+                assertTrue(attempt is Either.Left)
+                when (attempt) {
+                    is Either.Left -> {
+                        assertTrue(attempt.a is NoStackTrace)
+                        assertTrue(attempt.a.message == UnhandledException::class.java.simpleName)
+                    }
+                }
+            }.unsafeRunSync()
+        }
+
+        "If there is a missing identity in the left hand of a product the product will fail" {
+            fun <F> kollect(CF: Concurrent<F>): Kollect<F, Tuple2<Int, List<Int>>> {
+                val monad = Kollect.monad<F, Int>(CF)
+                return monad.tupled(never(CF), many(CF, 3)).fix()
+            }
+
+            val cf = IO.concurrent()
+            val io = Kollect.run(cf, IO.timer(EmptyCoroutineContext), kollect(cf))
+
+            io.attempt().map { attempt ->
+                assertTrue(attempt is Either.Left)
+                when (attempt) {
+                    is Either.Left -> {
+                        assertTrue(attempt.a is NoStackTrace)
+                        assertTrue(attempt.a.message == MissingIdentity::class.java.simpleName)
+                    }
+                }
+            }.unsafeRunSync()
+        }
+
+        "If there is a missing identity in the right hand of a product the product will fail" {
+            fun <F> kollect(CF: Concurrent<F>): Kollect<F, Tuple2<List<Int>, Int>> {
+                val monad = Kollect.monad<F, Int>(CF)
+                return monad.tupled(many(CF, 3), never(CF)).fix()
+            }
+
+            val cf = IO.concurrent()
+            val io = Kollect.run(cf, IO.timer(EmptyCoroutineContext), kollect(cf))
+
+            io.attempt().map { attempt ->
+                assertTrue(attempt is Either.Left)
+                when (attempt) {
+                    is Either.Left -> {
+                        assertTrue(attempt.a is NoStackTrace)
+                        assertTrue(attempt.a.message == MissingIdentity::class.java.simpleName)
+                    }
+                }
+            }.unsafeRunSync()
+        }
+
+        "If there are multiple failing identities the fetch will fail" {
+            fun <F> kollect(CF: Concurrent<F>): Kollect<F, Tuple2<Int, Int>> {
+                val monad = Kollect.monad<F, Int>(CF)
+                return monad.tupled(never(CF), never(CF)).fix()
+            }
+
+            val cf = IO.concurrent()
+            val io = Kollect.run(cf, IO.timer(EmptyCoroutineContext), kollect(cf))
+
+            io.attempt().map { attempt ->
+                assertTrue(attempt is Either.Left)
+                when (attempt) {
+                    is Either.Left -> {
+                        assertTrue(attempt.a is NoStackTrace)
+                        assertTrue(attempt.a.message == MissingIdentity::class.java.simpleName)
+                    }
+                }
+            }.unsafeRunSync()
+        }
+
+        // Optional fetches
+
+        data class MaybeMissing(val id: Int)
+
+        class MaybeMissingSource : DataSource<MaybeMissing, Int> {
+            override fun name(): DataSourceName = DataSourceName("Maybe Missing Source")
+
+            override fun <F> fetch(CF: Concurrent<F>, id: MaybeMissing): Kind<F, Option<Int>> =
+                    if (id.id % 2 == 0) {
+                        CF.just(None)
+                    } else {
+                        CF.just(Option(id.id))
+                    }
+        }
+
+        fun <F> maybeOpt(CF: Concurrent<F>, id: Int): Kollect<F, Option<Int>> =
+                Kollect.optional(CF, MaybeMissing(id), MaybeMissingSource())
 
         
     }
