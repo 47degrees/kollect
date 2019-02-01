@@ -341,9 +341,9 @@ class KollectTests : KollectSpec() {
             val envRounds = res.a.rounds
 
             result shouldBe Tuple2(Tuple2(1, 2), 3)
-            envRounds.size shouldBe 2 // 3
-            totalBatches(envRounds) shouldBe 2 // 3
-            totalFetched(envRounds) shouldBe 5 // 7
+            envRounds.size shouldBe 2
+            totalBatches(envRounds) shouldBe 2
+            totalFetched(envRounds) shouldBe 5
         }
     }
 }
