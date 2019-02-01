@@ -742,5 +742,62 @@ class KollectTests : KollectSpec() {
         }
 
         fun <F> forgetfulCache(CF: Concurrent<F>) = ForgetfulCache(CF)
+
+        "We can use a custom cache that discards elements" {
+            fun <F> kollect(CF: Concurrent<F>): Kollect<F, Int> {
+                val monad = Kollect.monad<F, Int>(CF)
+                return monad.binding {
+                    val aOne = one(CF, 1).bind()
+                    val anotherOne = one(CF, 1).bind()
+                    one(CF, 1).bind()
+                    one(CF, 2).bind()
+                    one(CF, 3).bind()
+                    one(CF, 1).bind()
+                    one(CF, 1).bind()
+
+                    aOne + anotherOne
+                }.fix()
+            }
+
+            val cf = IO.concurrent()
+            val io = Kollect.runEnv(cf, IO.timer(EmptyCoroutineContext), kollect(cf), forgetfulCache(cf))
+            val res = io.fix().unsafeRunSync()
+
+            val result = res.b
+            val envRounds = res.a.rounds
+
+            result shouldBe 2
+            envRounds.size shouldBe 7
+            totalFetched(envRounds) shouldBe 7
+        }
+
+        "We can use a custom cache that discards elements together with concurrent fetches" {
+            fun <F> kollect(CF: Concurrent<F>): Kollect<F, Int> {
+                val monad = Kollect.monad<F, Int>(CF)
+                return monad.binding {
+                    val aOne = one(CF, 1).bind()
+                    val anotherOne = one(CF, 1).bind()
+                    one(CF, 1).bind()
+                    one(CF, 2).bind()
+                    listOf(1, 2, 3).k().traverse(monad) { one(CF, it) }.bind()
+                    one(CF, 3).bind()
+                    one(CF, 1).bind()
+                    one(CF, 1).bind()
+
+                    aOne + anotherOne
+                }.fix()
+            }
+
+            val cf = IO.concurrent()
+            val io = Kollect.runEnv(cf, IO.timer(EmptyCoroutineContext), kollect(cf), forgetfulCache(cf))
+            val res = io.fix().unsafeRunSync()
+
+            val result = res.b
+            val envRounds = res.a.rounds
+
+            result shouldBe 2
+            envRounds.size shouldBe 8
+            totalFetched(envRounds) shouldBe 10
+        }
     }
 }
