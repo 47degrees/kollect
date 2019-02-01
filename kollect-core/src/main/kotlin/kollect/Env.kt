@@ -13,10 +13,10 @@ interface Env {
  * A data structure that holds information about a request inside a kollect round.
  */
 data class Request(
-  val request: KollectRequest,
-  val start: Long,
-  val end: Long,
-  val duration: Long = end - start
+        val request: KollectRequest,
+        val start: Long,
+        val end: Long,
+        val duration: Long = end - start
 )
 
 /**

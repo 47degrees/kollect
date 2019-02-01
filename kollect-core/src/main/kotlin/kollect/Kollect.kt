@@ -50,7 +50,7 @@ sealed class Kollect<F, A> : KollectOf<F, A> {
                         KollectResult.Blocked(
                                 combineRequestMaps<I, A, F>(MF, first.rs, second.rs),
                                 first.cont.product<I, B>(MF, second.cont))
-                    // second is Throw
+                    // second is KollectResult.Throw ->
                     else ->
                         KollectResult.Throw((second as KollectResult.Throw).e)
                 }
@@ -243,10 +243,9 @@ sealed class Kollect<F, A> : KollectOf<F, A> {
                 CF.just(Unit)
             } else {
                 CF.binding {
-                    val requests =
-                            KollectExecution.parallel(CF, NonEmptyList.fromListUnsafe(blockedRequests).map {
-                                runBlockedRequest(CF, TF, it, cache, env)
-                            }).bind()
+                    val requests = KollectExecution.parallel(CF, NonEmptyList.fromListUnsafe(blockedRequests).map {
+                        runBlockedRequest(CF, TF, it, cache, env)
+                    }).bind()
 
                     val performedRequests = requests.foldLeft(listOf<Request>()) { acc, list -> acc + list }
                     if (performedRequests.isEmpty()) {
