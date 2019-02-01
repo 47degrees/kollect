@@ -1,6 +1,8 @@
 package kollect.test
 
 import arrow.Kind
+import arrow.core.None
+import arrow.core.Option
 import arrow.core.Tuple2
 import arrow.data.*
 import arrow.data.extensions.list.traverse.sequence
@@ -9,13 +11,14 @@ import arrow.effects.IO
 import arrow.effects.extensions.io.concurrent.concurrent
 import arrow.effects.fix
 import arrow.effects.typeclasses.Concurrent
+import arrow.typeclasses.Monad
 import io.kotlintest.runner.junit4.KotlinTestRunner
 import io.kotlintest.shouldBe
-import kollect.Kollect
-import kollect.KollectQuery
+import kollect.*
 import kollect.extensions.io.timer.timer
 import kollect.extensions.kollect.monad.monad
-import kollect.fix
+import kollect.test.TestHelper.One
+import kollect.test.TestHelper.OneSource
 import kollect.test.TestHelper.anotherOne
 import kollect.test.TestHelper.many
 import kollect.test.TestHelper.one
@@ -580,5 +583,164 @@ class KollectTests : KollectSpec() {
             result shouldBe 2
             totalFetched(envRounds) shouldBe 3
         }
+
+        "Batched elements are cached and thus not kollected more than once" {
+            fun <F> kollect(CF: Concurrent<F>): Kollect<F, Int> {
+                val monad = Kollect.monad<F, Int>(CF)
+                return monad.binding {
+                    listOf(1, 2, 3).k().traverse(monad) { one(CF, it) }.bind()
+                    val aOne = one(CF, 1).bind()
+                    val anotherOne = one(CF, 1).bind()
+                    one(CF, 1).bind()
+                    one(CF, 2).bind()
+                    one(CF, 3).bind()
+                    one(CF, 1).bind()
+                    one(CF, 1).bind()
+
+                    aOne + anotherOne
+                }.fix()
+            }
+
+            val io = Kollect.runEnv(IO.concurrent(), IO.timer(EmptyCoroutineContext), kollect(IO.concurrent()))
+            val res = io.fix().unsafeRunSync()
+
+            val result = res.b
+            val envRounds = res.a.rounds
+
+            result shouldBe 2
+            envRounds.size shouldBe 1
+            totalFetched(envRounds) shouldBe 3
+        }
+
+        "Elements that are cached won't be kollected" {
+            fun <F> kollect(CF: Concurrent<F>): Kollect<F, Int> {
+                val monad = Kollect.monad<F, Int>(CF)
+                return monad.binding {
+                    val aOne = one(CF, 1).bind()
+                    val anotherOne = one(CF, 1).bind()
+                    one(CF, 1).bind()
+                    one(CF, 2).bind()
+                    one(CF, 3).bind()
+                    one(CF, 1).bind()
+                    listOf(1, 2, 3).k().traverse(monad) { one(CF, it) }.bind()
+                    one(CF, 1).bind()
+
+                    aOne + anotherOne
+                }.fix()
+            }
+
+            fun <F> cache(CF: Concurrent<F>) = InMemoryCache(CF, mapOf(
+                    Tuple2(OneSource.name(), DataSourceId(One(1))) to 1.dsResult(),
+                    Tuple2(OneSource.name(), DataSourceId(One(2))) to 2.dsResult(),
+                    Tuple2(OneSource.name(), DataSourceId(One(3))) to 3.dsResult()
+            ))
+
+            val cf = IO.concurrent()
+            val io = Kollect.runEnv(cf, IO.timer(EmptyCoroutineContext), kollect(cf), cache(cf))
+            val res = io.fix().unsafeRunSync()
+
+            val result = res.b
+            val envRounds = res.a.rounds
+
+            result shouldBe 2
+            envRounds.size shouldBe 0
+            totalFetched(envRounds) shouldBe 0
+        }
+
+        "Kollect#run accepts a cache as the second (optional) parameter" {
+            fun <F> kollect(CF: Concurrent<F>): Kollect<F, Int> {
+                val monad = Kollect.monad<F, Int>(CF)
+                return monad.binding {
+                    val aOne = one(CF, 1).bind()
+                    val anotherOne = one(CF, 1).bind()
+                    one(CF, 1).bind()
+                    one(CF, 2).bind()
+                    one(CF, 3).bind()
+                    one(CF, 1).bind()
+                    listOf(1, 2, 3).k().traverse(monad) { one(CF, it) }.bind()
+                    one(CF, 1).bind()
+
+                    aOne + anotherOne
+                }.fix()
+            }
+
+            fun <F> cache(CF: Concurrent<F>) = InMemoryCache(CF, mapOf(
+                    Tuple2(OneSource.name(), DataSourceId(One(1))) to 1.dsResult(),
+                    Tuple2(OneSource.name(), DataSourceId(One(2))) to 2.dsResult(),
+                    Tuple2(OneSource.name(), DataSourceId(One(3))) to 3.dsResult()
+            ))
+
+            val cf = IO.concurrent()
+            val io = Kollect.run(cf, IO.timer(EmptyCoroutineContext), kollect(cf), cache(cf))
+            val res = io.fix().unsafeRunSync()
+
+            res shouldBe 2
+        }
+
+        "Kollect#runCache accepts a cache as the second (optional) parameter" {
+            fun <F> kollect(CF: Concurrent<F>): Kollect<F, Int> {
+                val monad = Kollect.monad<F, Int>(CF)
+                return monad.binding {
+                    val aOne = one(CF, 1).bind()
+                    val anotherOne = one(CF, 1).bind()
+                    one(CF, 1).bind()
+                    one(CF, 2).bind()
+                    one(CF, 3).bind()
+                    one(CF, 1).bind()
+                    listOf(1, 2, 3).k().traverse(monad) { one(CF, it) }.bind()
+                    one(CF, 1).bind()
+
+                    aOne + anotherOne
+                }.fix()
+            }
+
+            fun <F> cache(CF: Concurrent<F>) = InMemoryCache(CF, mapOf(
+                    Tuple2(OneSource.name(), DataSourceId(One(1))) to 1.dsResult(),
+                    Tuple2(OneSource.name(), DataSourceId(One(2))) to 2.dsResult(),
+                    Tuple2(OneSource.name(), DataSourceId(One(3))) to 3.dsResult()
+            ))
+
+            val cf = IO.concurrent()
+            val io = Kollect.runCache(cf, IO.timer(EmptyCoroutineContext), kollect(cf), cache(cf))
+            val res = io.fix().unsafeRunSync()
+
+            res.b shouldBe 2
+        }
+
+        "Kollect#runCache works without the optional cache parameter" {
+            fun <F> kollect(CF: Concurrent<F>): Kollect<F, Int> {
+                val monad = Kollect.monad<F, Int>(CF)
+                return monad.binding {
+                    val aOne = one(CF, 1).bind()
+                    val anotherOne = one(CF, 1).bind()
+                    one(CF, 1).bind()
+                    one(CF, 2).bind()
+                    one(CF, 3).bind()
+                    one(CF, 1).bind()
+                    listOf(1, 2, 3).k().traverse(monad) { one(CF, it) }.bind()
+                    one(CF, 1).bind()
+
+                    aOne + anotherOne
+                }.fix()
+            }
+
+            val cf = IO.concurrent()
+            val io = Kollect.runCache(cf, IO.timer(EmptyCoroutineContext), kollect(cf))
+            val res = io.fix().unsafeRunSync()
+
+            res.b shouldBe 2
+        }
+
+        data class ForgetfulCache<F>(val MF: Monad<F>) : DataSourceCache<F> {
+            override fun <I : Any, A : Any> insert(i: I, v: A, ds: DataSource<I, A>): Kind<F, DataSourceCache<F>> {
+                return MF.just(this)
+            }
+
+            override fun <I : Any, A : Any> lookup(i: I, ds: DataSource<I, A>): Kind<F, Option<A>> {
+                return MF.just(None)
+            }
+        }
+
+        fun <F> forgetfulCache(CF: Concurrent<F>) = ForgetfulCache(CF)
     }
 }

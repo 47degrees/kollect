@@ -9,9 +9,9 @@ import arrow.data.extensions.listk.foldable.foldable
 import arrow.data.k
 import arrow.typeclasses.Monad
 
-data class DataSourceName(val name: String) : Any()
-data class DataSourceId(val id: Any) : Any()
-data class DataSourceResult(val result: Any) : Any()
+inline class DataSourceName(val name: String)
+inline class DataSourceId(val id: Any)
+inline class DataSourceResult(val result: Any)
 
 /**
  *  Users of Kollect can provide their own cache by implementing this interface.
@@ -39,11 +39,11 @@ data class InMemoryCache<F>(
 ) : DataSourceCache<F> {
 
     override fun <I : Any, A : Any> lookup(i: I, ds: DataSource<I, A>): Kind<F, Option<A>> = MF.run {
-        just(state[Tuple2(DataSourceName(ds.name()), DataSourceId(i))].toOption().map { it.result as A })
+        just(state[Tuple2(ds.name(), DataSourceId(i))].toOption().map { it.result as A })
     }
 
     override fun <I : Any, A : Any> insert(i: I, v: A, ds: DataSource<I, A>): Kind<F, DataSourceCache<F>> = MF.run {
-        just(copy(state = state.updated(Tuple2(DataSourceName(ds.name()), DataSourceId(i)), DataSourceResult(v))))
+        just(copy(state = state.updated(Tuple2(ds.name(), DataSourceId(i)), DataSourceResult(v))))
     }
 
     companion object {

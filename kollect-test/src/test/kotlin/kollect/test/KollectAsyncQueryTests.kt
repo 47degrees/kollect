@@ -13,6 +13,7 @@ import io.kotlintest.runner.junit4.KotlinTestRunner
 import io.kotlintest.shouldBe
 import io.kotlintest.specs.AbstractStringSpec
 import kollect.DataSource
+import kollect.DataSourceName
 import kollect.Kollect
 import kollect.extensions.io.timer.timer
 import kollect.extensions.kollect.monad.monad
@@ -95,7 +96,7 @@ object DataSources {
     }
 
     object ArticleAsync : DataSource<ArticleId, Article> {
-        override fun name() = "ArticleAsync"
+        override fun name() = DataSourceName("ArticleAsync")
 
         override fun <F> fetch(CF: Concurrent<F>, id: ArticleId): Kind<F, Option<Article>> {
             return CF.async { cb ->
@@ -111,7 +112,7 @@ object DataSources {
     data class Author(val id: Int, val name: String)
 
     object AuthorAsync : DataSource<AuthorId, Author> {
-        override fun name() = "AuthorAsync"
+        override fun name() = DataSourceName("AuthorAsync")
 
         override fun <F> fetch(CF: Concurrent<F>, id: AuthorId): Kind<F, Option<Author>> =
                 CF.async { cb ->
