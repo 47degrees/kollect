@@ -19,6 +19,7 @@ dependencies {
 
     implementation "org.jetbrains.kotlinx:kotlinx-coroutines-core:$kotlinxCoroutinesVersion"
 
+    testCompile "io.arrow-kt:arrow-generic:$arrow_version"
     testCompile "io.kotlintest:kotlintest-runner-junit4:$kotlinTestVersion"
     testCompile "io.kotlintest:kotlintest-runner-junit4:$kotlinTestVersion"
 }

@@ -419,5 +419,112 @@ class KollectTests : KollectSpec() {
             totalBatches(envRounds) shouldBe 3
             totalFetched(envRounds) shouldBe 9 + 4 + 6
         }
+
+        "The product of two kollects from the same data source implies batching" {
+            fun <F> kollect(CF: Concurrent<F>): Kollect<F, Tuple2<Int, Int>> {
+                val monad = Kollect.monad<F, Int>(CF)
+                return monad.tupled(one(CF, 1), one(CF, 3)).fix()
+            }
+
+            val io = Kollect.runEnv(IO.concurrent(), IO.timer(EmptyCoroutineContext), kollect(IO.concurrent()))
+            val res = io.fix().unsafeRunSync()
+
+            val result = res.b
+            val envRounds = res.a.rounds
+
+            result shouldBe Tuple2(1, 3)
+            envRounds.size shouldBe 1
+            totalBatches(envRounds) shouldBe 1
+            totalFetched(envRounds) shouldBe 2
+        }
+
+        "Sequenced kollects are run concurrently" {
+            fun <F> kollect(CF: Concurrent<F>): Kollect<F, Kind<ForListK, Int>> {
+                val monad = Kollect.monad<F, Int>(CF)
+                return listOf(one(CF, 1), one(CF, 2), one(CF, 3), anotherOne(CF, 4), anotherOne(CF, 5)).k().sequence(monad).fix()
+            }
+
+            val io = Kollect.runEnv(IO.concurrent(), IO.timer(EmptyCoroutineContext), kollect(IO.concurrent()))
+            val res = io.fix().unsafeRunSync()
+
+            val result = res.b
+            val envRounds = res.a.rounds
+
+            result shouldBe listOf(1, 2, 3, 4, 5)
+            envRounds.size shouldBe 1
+            totalBatches(envRounds) shouldBe 2
+        }
+
+        "Sequenced kollects are deduped" {
+            fun <F> kollect(CF: Concurrent<F>): Kollect<F, Kind<ForListK, Int>> {
+                val monad = Kollect.monad<F, Int>(CF)
+                return listOf(one(CF, 1), one(CF, 2), one(CF, 1)).k().sequence(monad).fix()
+            }
+
+            val io = Kollect.runEnv(IO.concurrent(), IO.timer(EmptyCoroutineContext), kollect(IO.concurrent()))
+            val res = io.fix().unsafeRunSync()
+
+            val result = res.b
+            val envRounds = res.a.rounds
+
+            result shouldBe listOf(1, 2, 1)
+            envRounds.size shouldBe 1
+            totalBatches(envRounds) shouldBe 1
+        }
+
+        "Traversals are batched" {
+            fun <F> kollect(CF: Concurrent<F>): Kollect<F, Kind<ForListK, Int>> {
+                val monad = Kollect.monad<F, Int>(CF)
+                return listOf(1, 2, 3).k().traverse(monad) { one(CF, it)}.fix()
+            }
+
+            val io = Kollect.runEnv(IO.concurrent(), IO.timer(EmptyCoroutineContext), kollect(IO.concurrent()))
+            val res = io.fix().unsafeRunSync()
+
+            val result = res.b
+            val envRounds = res.a.rounds
+
+            result shouldBe listOf(1, 2, 3)
+            envRounds.size shouldBe 1
+            totalBatches(envRounds) shouldBe 1
+        }
+
+        "Duplicated sources are only kollected once" {
+            fun <F> kollect(CF: Concurrent<F>): Kollect<F, Kind<ForListK, Int>> {
+                val monad = Kollect.monad<F, Int>(CF)
+                return listOf(1, 2, 1).k().traverse(monad) { one(CF, it)}.fix()
+            }
+
+            val io = Kollect.runEnv(IO.concurrent(), IO.timer(EmptyCoroutineContext), kollect(IO.concurrent()))
+            val res = io.fix().unsafeRunSync()
+
+            val result = res.b
+            val envRounds = res.a.rounds
+
+            result shouldBe listOf(1, 2, 1)
+            envRounds.size shouldBe 1
+            totalFetched(envRounds) shouldBe 2
+        }
+
+        "Sources that can be kollected concurrently inside a for comprehension will be" {
+            fun <F> kollect(CF: Concurrent<F>): Kollect<F, Kind<ForListK, Int>> {
+                val monad = Kollect.monad<F, Int>(CF)
+                return monad.binding {
+                    val v = Kollect.just(CF, listOf(1, 2, 1)).bind()
+                    val result = v.traverse(monad) { one(CF, it) }.bind()
+                    result
+                }.fix()
+            }
+
+            val io = Kollect.runEnv(IO.concurrent(), IO.timer(EmptyCoroutineContext), kollect(IO.concurrent()))
+            val res = io.fix().unsafeRunSync()
+
+            val result = res.b
+            val envRounds = res.a.rounds
+
+            result shouldBe listOf(1, 2, 1)
+            envRounds.size shouldBe 1
+            totalFetched(envRounds) shouldBe 2
+        }
     }
 }

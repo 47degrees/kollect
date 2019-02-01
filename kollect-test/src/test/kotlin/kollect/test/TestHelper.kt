@@ -4,6 +4,7 @@ import arrow.Kind
 import arrow.core.None
 import arrow.core.Option
 import arrow.core.Tuple2
+import arrow.core.Tuple5
 import arrow.data.NonEmptyList
 import arrow.effects.typeclasses.Concurrent
 import kollect.DataSource
@@ -71,4 +72,6 @@ object TestHelper {
 
     fun <F> never(CF: Concurrent<F>): Kollect<F, Int> =
             Kollect(CF, Never, NeverSource)
+
+    fun <A, B, C, D, E> Tuple5<A, B, C, D, E>.sequence() = listOf(a, b, c, d, e)
 }
