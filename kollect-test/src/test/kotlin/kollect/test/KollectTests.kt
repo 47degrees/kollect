@@ -1,6 +1,7 @@
 package kollect.test
 
 import arrow.Kind
+import arrow.core.Either
 import arrow.core.None
 import arrow.core.Option
 import arrow.core.Tuple2
@@ -8,20 +9,28 @@ import arrow.data.*
 import arrow.data.extensions.list.traverse.sequence
 import arrow.data.extensions.list.traverse.traverse
 import arrow.effects.IO
+import arrow.effects.extensions.io.applicativeError.attempt
+import arrow.effects.extensions.io.applicativeError.handleErrorWith
 import arrow.effects.extensions.io.concurrent.concurrent
+import arrow.effects.extensions.io.functor.map
 import arrow.effects.fix
 import arrow.effects.typeclasses.Concurrent
 import arrow.typeclasses.Monad
 import io.kotlintest.runner.junit4.KotlinTestRunner
 import io.kotlintest.shouldBe
 import kollect.*
+import kollect.KollectException.MissingIdentity
 import kollect.extensions.io.timer.timer
 import kollect.extensions.kollect.monad.monad
+import kollect.test.TestHelper.Never
+import kollect.test.TestHelper.NeverSource
 import kollect.test.TestHelper.One
 import kollect.test.TestHelper.OneSource
 import kollect.test.TestHelper.anotherOne
 import kollect.test.TestHelper.many
+import kollect.test.TestHelper.never
 import kollect.test.TestHelper.one
+import org.junit.Assert.assertTrue
 import org.junit.runner.RunWith
 import kotlin.coroutines.EmptyCoroutineContext
 
@@ -771,7 +780,7 @@ class KollectTests : KollectSpec() {
             totalFetched(envRounds) shouldBe 7
         }
 
-        "We can use a custom cache that discards elements together with concurrent fetches" {
+        "We can use a custom cache that discards elements together with concurrent kollects" {
             fun <F> kollect(CF: Concurrent<F>): Kollect<F, Int> {
                 val monad = Kollect.monad<F, Int>(CF)
                 return monad.binding {
@@ -799,5 +808,46 @@ class KollectTests : KollectSpec() {
             envRounds.size shouldBe 8
             totalFetched(envRounds) shouldBe 10
         }
+
+        // Errors
+
+        "Data sources with errors throw kollect failures" {
+            val cf = IO.concurrent()
+            val io = Kollect.run(cf, IO.timer(EmptyCoroutineContext), never(cf))
+            io.attempt().map { attempt ->
+                assertTrue(attempt is Either.Left)
+                when (attempt) {
+                    is Either.Left -> {
+                        assertTrue(attempt.a is NoStackTrace)
+                        assertTrue(attempt.a.message == MissingIdentity::class.java.simpleName)
+                    }
+                }
+            }.unsafeRunSync()
+        }
+
+        "Data sources with errors throw kollect failures that can be handled" {
+            val cf = IO.concurrent()
+            val io = Kollect.run(cf, IO.timer(EmptyCoroutineContext), never(cf))
+
+            io.handleErrorWith { IO.just(42) }
+                    .map { it shouldBe 42 }
+                    .unsafeRunSync()
+        }
+
+        "Data sources with errors won't fail if they're cached" {
+            fun <F> cache(CF: Concurrent<F>) = InMemoryCache(CF, mapOf(
+                    Tuple2(NeverSource.name(), DataSourceId(Never)) to 1.dsResult()
+            ))
+
+            val cf = IO.concurrent()
+            val io = Kollect.run(cf, IO.timer(EmptyCoroutineContext), never(cf), cache(cf))
+
+            io.map { it shouldBe 1 }.unsafeRunSync()
+        }
+
+        fun <F> fetchError(CF: Concurrent<F>): Kollect<F, Int> =
+                Kollect.error(CF, TestHelper.AnException)
+
+        
     }
 }
