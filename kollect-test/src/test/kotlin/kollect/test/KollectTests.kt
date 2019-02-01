@@ -20,7 +20,6 @@ import kollect.KollectException.MissingIdentity
 import kollect.KollectException.UnhandledException
 import kollect.extensions.io.timer.timer
 import kollect.extensions.kollect.monad.monad
-import kollect.extensions.kollect.monad.map
 import kollect.test.TestHelper.AnException
 import kollect.test.TestHelper.Never
 import kollect.test.TestHelper.NeverSource
@@ -33,6 +32,7 @@ import kollect.test.TestHelper.one
 import org.junit.Assert.assertTrue
 import org.junit.runner.RunWith
 import kotlin.coroutines.EmptyCoroutineContext
+import kollect.extensions.kollect.monad.map as mapK
 
 @RunWith(KotlinTestRunner::class)
 class KollectTests : KollectSpec() {
@@ -999,25 +999,72 @@ class KollectTests : KollectSpec() {
             }.unsafeRunSync()
         }
 
-//        "We can run optional kollects with traverse" {
-//            fun <F> kollect(CF: Concurrent<F>): Kollect<F, ListK<Int>> {
-//                val monad = Kollect.monad<F, Int>(CF)
-//                return listOf(1, 2, 3).traverse(Kollect.monad<F, Int>(CF)) { i -> maybeOpt(CF, i) }.fix().map(CF) { it.flatten() }
-//            }
-//
-//            val cf = IO.concurrent()
-//            Kollect.run(cf, IO.timer(EmptyCoroutineContext), kollect(cf)).map {
-//                it shouldBe Some(1)
-//            }.unsafeRunSync()
-//        }
+        "We can run optional kollects with traverse" {
+            fun <F> kollect(CF: Concurrent<F>): Kollect<F, ListK<Int>> {
+                val monad = Kollect.monad<F, Int>(CF)
+                return listOf(1, 2, 3).traverse(monad) { maybeOpt(CF, it) }
+                        .mapK<F, Int, Kind<ForListK, Option<Int>>, ListK<Int>>(CF) {
+                            it.fix().fold(listOf()) { acc: List<Int>, i: Option<Int> ->
+                                acc + i.fold(ifEmpty = { emptyList<Int>() }, ifSome = { a -> listOf(a) })
+                            }.k()
+                        }
+            }
 
+            val cf = IO.concurrent()
+            Kollect.run(cf, IO.timer(EmptyCoroutineContext), kollect(cf)).map {
+                it shouldBe listOf(1, 3)
+            }.unsafeRunSync()
+        }
 
-        // fun <G, A, B> Kind<F, A>.flatTraverse(MF: Monad<F>, AG: Applicative<G>, f: (A) -> Kind<G, Kind<F, B>>): Kind<G, Kind<F, B>> =
-        //    AG.run { traverse(this, f).map { MF.run { it.flatten() } } }
+        "We can run optional kollects with other data sources" {
+            fun <F> kollect(CF: Concurrent<F>): Kollect<F, List<Int>> {
+                val monad = Kollect.monad<F, Int>(CF)
+                val ones = listOf(1, 2, 3).traverse(monad) { one(CF, it) }.fix()
+                val maybes = listOf(1, 2, 3).traverse(monad) { maybeOpt(CF, it) }.fix()
 
+                return monad.map(ones, maybes) { tuple ->
+                    tuple.a.fix() + tuple.b.fix().flatMap { option: Option<Int> ->
+                        option.fold(ifEmpty = { emptyList<Int>() }, ifSome = { a -> listOf(a) }).k()
+                    }
+                }.fix()
+            }
 
-        // List(1, 2, 3).traverse(maybeOpt[F]).map(_.flatten)
+            val cf = IO.concurrent()
+            Kollect.run(cf, IO.timer(EmptyCoroutineContext), kollect(cf)).map {
+                it shouldBe listOf(1, 2, 3, 1, 3)
+            }.unsafeRunSync()
+        }
 
-        // Fetch.run[IO](fetch).map(_ shouldEqual List(1, 3)).unsafeToFuture
+        "We can make kollects that depend on optional kollect results when they aren't defined" {
+            fun <F> kollect(CF: Concurrent<F>): Kollect<F, Int> {
+                val monad = Kollect.monad<F, Int>(CF)
+                return monad.binding {
+                    val maybe = maybeOpt(CF, 2).bind()
+                    val result = maybe.fold(ifEmpty = { Kollect.just(CF, 42) }, ifSome = { one(CF, it) }).bind()
+                    result
+                }.fix()
+            }
+
+            val cf = IO.concurrent()
+            Kollect.run(cf, IO.timer(EmptyCoroutineContext), kollect(cf)).map {
+                it shouldBe 42
+            }.unsafeRunSync()
+        }
+
+        "We can make kollects that depend on optional kollect results when they are defined" {
+            fun <F> kollect(CF: Concurrent<F>): Kollect<F, Int> {
+                val monad = Kollect.monad<F, Int>(CF)
+                return monad.binding {
+                    val maybe = maybeOpt(CF, 1).bind()
+                    val result = maybe.fold(ifEmpty = { Kollect.just(CF, 42) }, ifSome = { one(CF, it) }).bind()
+                    result
+                }.fix()
+            }
+
+            val cf = IO.concurrent()
+            Kollect.run(cf, IO.timer(EmptyCoroutineContext), kollect(cf)).map {
+                it shouldBe 1
+            }.unsafeRunSync()
+        }
     }
 }
