@@ -4,8 +4,7 @@ import arrow.Kind
 import arrow.core.Option
 import arrow.core.Tuple2
 import arrow.core.toOption
-import arrow.data.ListK
-import arrow.data.extensions.listk.foldable.foldable
+import arrow.data.extensions.listk.foldable.foldM
 import arrow.data.k
 import arrow.typeclasses.Monad
 
@@ -23,7 +22,7 @@ interface DataSourceCache<F> {
     fun <I : Any, A : Any> bulkInsert(
             MF: Monad<F>,
             vs: List<Tuple2<I, A>>,
-            ds: DataSource<I, A>): Kind<F, DataSourceCache<F>> = ListK.foldable().foldLeftM(MF, vs.k(), this) { cache, tuple: Tuple2<I, A> ->
+            ds: DataSource<I, A>): Kind<F, DataSourceCache<F>> = vs.k().foldM(MF, this) { cache, tuple ->
         cache.insert(tuple.a, tuple.b, ds)
     }
 }
