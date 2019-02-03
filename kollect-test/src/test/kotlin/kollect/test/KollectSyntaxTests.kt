@@ -21,19 +21,19 @@ class KollectSyntaxTests : KollectSpec() {
 
         "fetch syntax allows lifting of any value to the context of a fetch" {
             val concurrent = IO.concurrent()
-            Kollect.just(concurrent, 42) shouldBe 42.fetch(concurrent)
+            Kollect.just(concurrent, 42) shouldBe concurrent.fetch(42)
         }
 
         "fetch syntax can be used on infix position" {
             val concurrent = IO.concurrent()
-            Kollect.just(concurrent, 42) shouldBe (42 fetch concurrent)
+            Kollect.just(concurrent, 42) shouldBe (concurrent fetch 42)
         }
 
         "fetch syntax allows lifting of any `Throwable` as a failure on a kollect" {
             class Ex : RuntimeException()
 
             fun <F> f1(CF: Concurrent<F>) = Kollect.error<F, Int>(CF, Ex())
-            fun <F> f2(CF: Concurrent<F>): Kollect<F, Int> = Ex().fetch(CF)
+            fun <F> f2(CF: Concurrent<F>): Kollect<F, Int> = CF.fetch(Ex())
 
             val cf = IO.concurrent()
             val io1 = Kollect.runEnv(cf, IO.timer(EmptyCoroutineContext), f1(cf))
@@ -50,7 +50,7 @@ class KollectSyntaxTests : KollectSpec() {
             class Ex : RuntimeException()
 
             fun <F> f1(CF: Concurrent<F>) = Kollect.error<F, Int>(CF, Ex())
-            fun <F> f2(CF: Concurrent<F>): Kollect<F, Int> = Ex() fetch CF
+            fun <F> f2(CF: Concurrent<F>): Kollect<F, Int> = CF fetch Ex()
 
             val cf = IO.concurrent()
             val io1 = Kollect.runEnv(cf, IO.timer(EmptyCoroutineContext), f1(cf))

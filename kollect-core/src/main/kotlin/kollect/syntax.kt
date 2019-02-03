@@ -2,6 +2,6 @@ package kollect
 
 import arrow.effects.typeclasses.Concurrent
 
-infix fun <F, A> A.fetch(CF: Concurrent<F>): Kollect<F, A> = Kollect.just(CF, this)
+infix fun <F, A> Concurrent<F>.fetch(a: A): Kollect<F, A> = Kollect.just(this, a)
 
-infix fun <F, B> Throwable.fetch(CF: Concurrent<F>): Kollect<F, B> = Kollect.error(CF, this)
+infix fun <F, B> Concurrent<F>.fetch(throwable: Throwable): Kollect<F, B> = Kollect.error(this, throwable)
