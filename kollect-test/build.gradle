@@ -14,6 +14,7 @@ dependencies {
 
     implementation "io.arrow-kt:arrow-core-data:$arrowVersion"
     implementation "io.arrow-kt:arrow-effects:$arrowVersion"
+    implementation "io.arrow-kt:arrow-effects-io-extensions:$arrowVersion"
 
     kapt "io.arrow-kt:arrow-annotations-processor:$arrowVersion"
 

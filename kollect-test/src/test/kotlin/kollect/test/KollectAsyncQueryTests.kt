@@ -8,6 +8,7 @@ import arrow.data.ListK
 import arrow.data.extensions.list.traverse.traverse
 import arrow.data.fix
 import arrow.effects.IO
+import arrow.effects.extensions.concurrent
 import arrow.effects.extensions.io.concurrent.concurrent
 import arrow.effects.extensions.io.functor.map
 import arrow.effects.typeclasses.Concurrent
