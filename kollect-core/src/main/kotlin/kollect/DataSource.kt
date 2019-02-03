@@ -17,7 +17,7 @@ interface DataSource<I, A> {
     /**
      * Name given to the data source. Defaults to "KollectDataSource:${this.javaClass.simpleName}".
      */
-    fun name(): DataSourceName = DataSourceName("KollectDataSource:${this.javaClass.simpleName}")
+    fun name(): String = "KollectDataSource:${this.javaClass.simpleName}"
 
     /**
      * Fetches a value from the source of data by its given Identity. Requires an instance of Concurrent.

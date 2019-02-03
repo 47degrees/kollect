@@ -9,8 +9,6 @@ import arrow.data.extensions.listk.foldable.foldable
 import arrow.data.k
 import arrow.typeclasses.Monad
 
-inline class DataSourceName(val name: String)
-inline class DataSourceId(val id: Any)
 inline class DataSourceResult(val result: Any)
 
 /**
@@ -35,15 +33,15 @@ interface DataSourceCache<F> {
  */
 data class InMemoryCache<F>(
         val MF: Monad<F>,
-        val state: Map<Tuple2<DataSourceName, DataSourceId>, DataSourceResult>
+        val state: Map<Tuple2<String, Any>, DataSourceResult>
 ) : DataSourceCache<F> {
 
     override fun <I : Any, A : Any> lookup(i: I, ds: DataSource<I, A>): Kind<F, Option<A>> = MF.run {
-        just(state[Tuple2(ds.name(), DataSourceId(i))].toOption().map { it.result as A })
+        just(state[Tuple2(ds.name(), i)].toOption().map { it.result as A })
     }
 
     override fun <I : Any, A : Any> insert(i: I, v: A, ds: DataSource<I, A>): Kind<F, DataSourceCache<F>> = MF.run {
-        just(copy(state = state.updated(Tuple2(ds.name(), DataSourceId(i)), DataSourceResult(v))))
+        just(copy(state = state.updated(Tuple2(ds.name(), i), DataSourceResult(v))))
     }
 
     companion object {
@@ -57,7 +55,7 @@ data class InMemoryCache<F>(
             val s = tuple2.a.a
             val i = tuple2.a.b
             val v = tuple2.b
-            acc.updated(Tuple2(DataSourceName(s), DataSourceId(i)), DataSourceResult(v))
+            acc.updated(Tuple2(s, i), DataSourceResult(v))
         })
     }
 }

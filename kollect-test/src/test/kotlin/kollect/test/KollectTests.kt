@@ -638,10 +638,10 @@ class KollectTests : KollectSpec() {
                 }.fix()
             }
 
-            fun <F> cache(CF: Concurrent<F>) = InMemoryCache(CF, mapOf(
-                    Tuple2(OneSource.name(), DataSourceId(One(1))) to 1.dsResult(),
-                    Tuple2(OneSource.name(), DataSourceId(One(2))) to 2.dsResult(),
-                    Tuple2(OneSource.name(), DataSourceId(One(3))) to 3.dsResult()
+            fun <F> cache(CF: Concurrent<F>) = InMemoryCache<F>(CF, mapOf(
+                    Tuple2(OneSource.name(), One(1)) to 1.dsResult(),
+                    Tuple2(OneSource.name(), One(2)) to 2.dsResult(),
+                    Tuple2(OneSource.name(), One(3)) to 3.dsResult()
             ))
 
             val cf = IO.concurrent()
@@ -673,10 +673,10 @@ class KollectTests : KollectSpec() {
                 }.fix()
             }
 
-            fun <F> cache(CF: Concurrent<F>) = InMemoryCache(CF, mapOf(
-                    Tuple2(OneSource.name(), DataSourceId(One(1))) to 1.dsResult(),
-                    Tuple2(OneSource.name(), DataSourceId(One(2))) to 2.dsResult(),
-                    Tuple2(OneSource.name(), DataSourceId(One(3))) to 3.dsResult()
+            fun <F> cache(CF: Concurrent<F>) = InMemoryCache<F>(CF, mapOf(
+                    Tuple2(OneSource.name(), One(1)) to 1.dsResult(),
+                    Tuple2(OneSource.name(), One(2)) to 2.dsResult(),
+                    Tuple2(OneSource.name(), One(3)) to 3.dsResult()
             ))
 
             val cf = IO.concurrent()
@@ -703,10 +703,10 @@ class KollectTests : KollectSpec() {
                 }.fix()
             }
 
-            fun <F> cache(CF: Concurrent<F>) = InMemoryCache(CF, mapOf(
-                    Tuple2(OneSource.name(), DataSourceId(One(1))) to 1.dsResult(),
-                    Tuple2(OneSource.name(), DataSourceId(One(2))) to 2.dsResult(),
-                    Tuple2(OneSource.name(), DataSourceId(One(3))) to 3.dsResult()
+            fun <F> cache(CF: Concurrent<F>) = InMemoryCache<F>(CF, mapOf(
+                    Tuple2(OneSource.name(), One(1)) to 1.dsResult(),
+                    Tuple2(OneSource.name(), One(2)) to 2.dsResult(),
+                    Tuple2(OneSource.name(), One(3)) to 3.dsResult()
             ))
 
             val cf = IO.concurrent()
@@ -835,8 +835,8 @@ class KollectTests : KollectSpec() {
         }
 
         "Data sources with errors won't fail if they're cached" {
-            fun <F> cache(CF: Concurrent<F>) = InMemoryCache(CF, mapOf(
-                    Tuple2(NeverSource.name(), DataSourceId(Never)) to 1.dsResult()
+            fun <F> cache(CF: Concurrent<F>) = InMemoryCache<F>(CF, mapOf(
+                    Tuple2(NeverSource.name(), Never) to 1.dsResult()
             ))
 
             val cf = IO.concurrent()
@@ -977,7 +977,7 @@ class KollectTests : KollectSpec() {
         data class MaybeMissing(val id: Int)
 
         class MaybeMissingSource : DataSource<MaybeMissing, Int> {
-            override fun name(): DataSourceName = DataSourceName("Maybe Missing Source")
+            override fun name(): String = "Maybe Missing Source"
 
             override fun <F> fetch(CF: Concurrent<F>, id: MaybeMissing): Kind<F, Option<Int>> =
                     if (id.id % 2 == 0) {
