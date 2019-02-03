@@ -23,6 +23,9 @@ interface KollectApplicative<F, I> : Applicative<KollectPartialOf<F>>, KollectFu
 
     override fun <A> just(a: A): Kollect<F, A> = Kollect.Unkollect(MF().just(KollectResult.Done(a)))
 
+    override fun <A, B> KollectOf<F, A>.ap(ff: KollectOf<F, (A) -> B>): Kollect<F, B> =
+        fix().ap(MF(), ff)
+
     override fun <A, B> KollectOf<F, A>.product(fb: KollectOf<F, B>): Kollect<F, Tuple2<A, B>> =
             fix().product<I, B>(MF(), fb)
 
@@ -33,6 +36,9 @@ interface KollectApplicative<F, I> : Applicative<KollectPartialOf<F>>, KollectFu
 interface KollectMonad<F, I> : Monad<KollectPartialOf<F>>, KollectApplicative<F, I> {
 
     override fun MF(): Monad<F>
+
+    override fun <A, B> KollectOf<F, A>.ap(ff: KollectOf<F, (A) -> B>): Kollect<F, B> =
+        fix().ap(MF(), ff)
 
     override fun <A, B> tailRecM(a: A, f: (A) -> KollectOf<F, Either<A, B>>): Kollect<F, B> =
             Kollect.tailRecM(MF(), a, f)

@@ -32,6 +32,8 @@ sealed class Kollect<F, A> : KollectOf<F, A> {
                 result
             })
 
+    fun <B> ap(AF: Applicative<F>, ff: KollectOf<F, (A) -> B>): Kollect<F, B> = TODO()
+
     fun <I, B> product(MF: Monad<F>, fb: Kind<KollectPartialOf<F>, B>): Kollect<F, Tuple2<A, B>> =
             Unkollect(MF.binding {
                 val fab = MF.tupled(run, fb.fix().run).bind()
