@@ -1,5 +1,6 @@
 package kollect.extensions
 
+import arrow.core.Right
 import arrow.core.Tuple2
 import arrow.core.right
 import arrow.core.some
@@ -14,6 +15,9 @@ import arrow.typeclasses.Functor
 import arrow.typeclasses.Monoid
 import kollect.typeclasses.Clock
 import kollect.typeclasses.Timer
+import java.util.concurrent.Executors
+import java.util.concurrent.ScheduledExecutorService
+import java.util.concurrent.TimeUnit
 import kotlin.coroutines.CoroutineContext
 
 @extension
@@ -102,8 +106,31 @@ interface IOTimer : Timer<ForIO> {
 
     override fun sleep(duration: Duration): IO<Unit> =
             IO.async { conn, cb ->
+                // Doing what IO.cancelable does
                 val ref = ForwardCancelable()
                 conn.push(ref.cancel())
-                IO { cb(Unit.right()) }.unsafeRunTimed(duration)
+
+                // Race condition test
+                if (!conn.isCanceled()) {
+                    val scheduledFuture = scheduler.schedule({
+                        conn.pop()
+                        cb(Right(Unit))
+                    }, duration.nanoseconds, TimeUnit.NANOSECONDS)
+
+                    ref.complete(IO {
+                        scheduledFuture.cancel(false)
+                        Unit
+                    })
+
+                } else ref.complete(IO.unit)
             }
+}
+
+private val scheduler: ScheduledExecutorService by lazy {
+    Executors.newScheduledThreadPool(2) { r ->
+        Thread(r).apply {
+            name = "arrow-effects-scheduler-$id"
+            isDaemon = true
+        }
+    }
 }
