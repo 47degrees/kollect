@@ -13,7 +13,6 @@ import arrow.typeclasses.Functor
 import arrow.typeclasses.Monad
 import arrow.typeclasses.Monoid
 import kollect.typeclasses.Clock
-import kollect.typeclasses.stateT
 import java.util.concurrent.TimeUnit
 
 @extension
