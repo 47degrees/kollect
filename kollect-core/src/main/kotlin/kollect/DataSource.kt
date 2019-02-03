@@ -39,7 +39,7 @@ interface DataSource<I, A> {
         ).bind()
         val results: List<Tuple2<I, A>> = tuples.collect(PartialFunction(
                 definedAt = { it.b is Some<A> },
-                ifDefined = { it.a.toT((it.b as Some<A>).t) }
+                ifDefined = { Tuple2(it.a, (it.b as Some<A>).t) }
         ))
         results.associateBy({ it.a }, { it.b })
     }
