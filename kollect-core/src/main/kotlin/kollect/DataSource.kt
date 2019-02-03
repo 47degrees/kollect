@@ -35,7 +35,7 @@ interface DataSource<I, A> {
     fun <F> batch(CF: Concurrent<F>, ids: NonEmptyList<I>): Kind<F, Map<I, A>> = CF.binding {
         val tuples = KollectExecution.parallel(
                 CF,
-                ids.map { id -> fetch(CF, id).map { v -> id.toT(v) } }
+                ids.map { id -> fetch(CF, id).map { v -> Tuple2(id, v) } }
         ).bind()
         val results: List<Tuple2<I, A>> = tuples.collect(PartialFunction(
                 definedAt = { it.b is Some<A> },
