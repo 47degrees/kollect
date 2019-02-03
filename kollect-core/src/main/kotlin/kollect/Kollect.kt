@@ -327,15 +327,15 @@ sealed class Kollect<F, A> : KollectOf<F, A> {
                 c.lookup(i, q.ds).tupleLeft(i)
             }.bind()
 
-            val cachedResults = idLookups.collect<Tuple2<Any, Option<Any>>, Pair<Any, Any>>(PartialFunction(
-                    definedAt = { it.b is Some },
-                    ifDefined = { Pair(it.a, (it.b as Some).t) }
-            )).toMap()
+            val cachedResults = idLookups.collect(
+                    f = { Pair(it.a, (it.b as Some).t) },
+                    filter = { it.b is Some }
+            ).toMap()
 
-            val uncachedIds = idLookups.collect<Tuple2<Any, Option<Any>>, Any>(PartialFunction(
-                    definedAt = { it.b is None },
-                    ifDefined = { it.a }
-            ))
+            val uncachedIds = idLookups.collect(
+                    f = { it.a },
+                    filter = { it.b is None }
+            )
 
             val result = when {
                 // All cached

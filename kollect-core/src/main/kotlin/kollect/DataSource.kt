@@ -1,7 +1,10 @@
 package kollect
 
 import arrow.Kind
-import arrow.core.*
+import arrow.core.None
+import arrow.core.Option
+import arrow.core.Some
+import arrow.core.Tuple2
 import arrow.data.NonEmptyList
 import arrow.effects.typeclasses.Concurrent
 
@@ -37,10 +40,10 @@ interface DataSource<I, A> {
                 CF,
                 ids.map { id -> fetch(CF, id).map { v -> Tuple2(id, v) } }
         ).bind()
-        val results: List<Tuple2<I, A>> = tuples.collect(PartialFunction(
-                definedAt = { it.b is Some<A> },
-                ifDefined = { Tuple2(it.a, (it.b as Some<A>).t) }
-        ))
+        val results: List<Tuple2<I, A>> = tuples.collect(
+                f = { Tuple2(it.a, (it.b as Some<A>).t) },
+                filter = { it.b is Some<A> }
+        )
         results.associateBy({ it.a }, { it.b })
     }
 
