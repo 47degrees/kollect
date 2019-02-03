@@ -1,14 +1,10 @@
 package kollect
 
 import arrow.Kind
-import arrow.core.PartialFunction
 import arrow.core.Tuple2
-import arrow.core.andThen
-import arrow.core.invokeOrElse
 import arrow.data.NonEmptyList
 import arrow.data.extensions.nonemptylist.foldable.traverse_
 import arrow.effects.typeclasses.Concurrent
-import arrow.typeclasses.ApplicativeError
 import kotlinx.coroutines.Dispatchers
 
 internal object KollectExecution {
