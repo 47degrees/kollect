@@ -53,7 +53,7 @@ interface StateTClock<F, S> : Clock<StateTPartialOf<F, S>> {
 
     fun clock(): Clock<F>
 
-    override fun realTime(unit: TimeUnit): StateT<F, S, Long> = stateT(MF(), clock().realTime(unit))
+    override fun realTime(unit: TimeUnit): StateT<F, S, Long> = StateT.liftF(MF(), clock().realTime(unit))
 
     override fun monotonic(unit: TimeUnit): StateT<F, S, Long> = stateT(MF(), clock().monotonic(unit))
 }
