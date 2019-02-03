@@ -34,13 +34,13 @@ interface DataSourceCache<F> {
 data class InMemoryCache<F>(
         val MF: Monad<F>,
         val state: Map<Tuple2<String, Any>, DataSourceResult>
-) : DataSourceCache<F> {
+) : DataSourceCache<F>, Monad<F> by MF {
 
-    override fun <I : Any, A : Any> lookup(i: I, ds: DataSource<I, A>): Kind<F, Option<A>> = MF.run {
+    override fun <I : Any, A : Any> lookup(i: I, ds: DataSource<I, A>): Kind<F, Option<A>> = run {
         just(state[Tuple2(ds.name(), i)].toOption().map { it.result as A })
     }
 
-    override fun <I : Any, A : Any> insert(i: I, v: A, ds: DataSource<I, A>): Kind<F, DataSourceCache<F>> = MF.run {
+    override fun <I : Any, A : Any> insert(i: I, v: A, ds: DataSource<I, A>): Kind<F, DataSourceCache<F>> = run {
         just(copy(state = state.updated(Tuple2(ds.name(), i), DataSourceResult(v))))
     }
 
