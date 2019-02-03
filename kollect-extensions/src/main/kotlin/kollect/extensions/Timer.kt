@@ -110,7 +110,7 @@ interface IOTimer : Timer<ForIO> {
                 val ref = ForwardCancelable()
                 conn.push(ref.cancel())
 
-                // Race condition test
+                // If not cancelled yet, schedule the task and wire the cancellation to scheduler
                 if (!conn.isCanceled()) {
                     val scheduledFuture = scheduler.schedule({
                         conn.pop()
@@ -121,7 +121,6 @@ interface IOTimer : Timer<ForIO> {
                         scheduledFuture.cancel(false)
                         Unit
                     })
-
                 } else ref.complete(IO.unit)
             }
 }
