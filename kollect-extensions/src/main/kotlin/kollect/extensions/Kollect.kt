@@ -28,6 +28,6 @@ interface KollectMonad<F, I> : Monad<KollectPartialOf<F>> {
             Kollect.tailRecM(MF(), a, f)
 
     override fun <A, B> Kind<KollectPartialOf<F>, A>.flatMap(f: (A) -> Kind<KollectPartialOf<F>, B>): Kollect<F, B> = MF().run {
-        fix().flatMap(MF(), f)
+        fix().flatMap(this, f)
     }
 }
