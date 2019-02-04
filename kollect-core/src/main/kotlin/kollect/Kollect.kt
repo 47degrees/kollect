@@ -3,6 +3,7 @@
 package kollect
 
 import arrow.Kind
+import arrow.Kind2
 import arrow.core.*
 import arrow.data.NonEmptyList
 import arrow.effects.Promise
@@ -32,7 +33,8 @@ sealed class Kollect<F, A> : KollectOf<F, A> {
                 result
             })
 
-    fun <B> ap(AF: Applicative<F>, ff: KollectOf<F, (A) -> B>): Kollect<F, B> = TODO()
+    fun <I, B> ap(MF: Monad<F>, ff: Kind<KollectPartialOf<F>, (A) -> B>): Kollect<F, B> =
+            product<I, (A) -> B>(MF, ff).map(MF) { tuple -> tuple.b(tuple.a) }
 
     fun <I, B> product(MF: Monad<F>, fb: Kind<KollectPartialOf<F>, B>): Kollect<F, Tuple2<A, B>> =
             Unkollect(MF.binding {
