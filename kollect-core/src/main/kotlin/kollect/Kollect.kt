@@ -35,30 +35,30 @@ sealed class Kollect<F, A> : KollectOf<F, A> {
     fun <I, B> ap(MF: Monad<F>, ff: Kind<KollectPartialOf<F>, (A) -> B>): Kollect<F, B> =
             product<I, (A) -> B>(MF, ff).map(MF) { tuple -> tuple.b(tuple.a) }
 
-    fun <I, B> product(MF: Monad<F>, fb: Kind<KollectPartialOf<F>, B>): Kollect<F, Tuple2<A, B>> =
-            Unkollect(MF.binding {
-                val fab = MF.tupled(run, fb.fix().run).bind()
-                val first = fab.a
-                val second = fab.b
-                val result = when {
-                    first is KollectResult.Throw ->
-                        KollectResult.Throw<F, Tuple2<A, B>>(first.e)
-                    first is KollectResult.Done && second is KollectResult.Done ->
-                        KollectResult.Done(Tuple2(first.x, second.x))
-                    first is KollectResult.Done && second is KollectResult.Blocked ->
-                        KollectResult.Blocked(second.rs, product<I, B>(MF, second.cont))
-                    first is KollectResult.Blocked && second is KollectResult.Done ->
-                        KollectResult.Blocked(first.rs, first.cont.product<I, B>(MF, fb))
-                    first is KollectResult.Blocked && second is KollectResult.Blocked ->
-                        KollectResult.Blocked(
-                                combineRequestMaps<I, A, F>(MF, first.rs, second.rs),
-                                first.cont.product<I, B>(MF, second.cont))
-                    // second is KollectResult.Throw ->
-                    else ->
-                        KollectResult.Throw((second as KollectResult.Throw).e)
-                }
-                result
-            })
+    fun <I, B> product(MF: Monad<F>, fb: Kind<KollectPartialOf<F>, B>): Kollect<F, Tuple2<A, B>> = MF.run {
+        Unkollect(MF.tupled(run, fb.fix().run).flatMap { fab ->
+            val first = fab.a
+            val second = fab.b
+            val result = when {
+                first is KollectResult.Throw ->
+                    KollectResult.Throw<F, Tuple2<A, B>>(first.e)
+                first is KollectResult.Done && second is KollectResult.Done ->
+                    KollectResult.Done(Tuple2(first.x, second.x))
+                first is KollectResult.Done && second is KollectResult.Blocked ->
+                    KollectResult.Blocked(second.rs, product<I, B>(MF, second.cont))
+                first is KollectResult.Blocked && second is KollectResult.Done ->
+                    KollectResult.Blocked(first.rs, first.cont.product<I, B>(MF, fb))
+                first is KollectResult.Blocked && second is KollectResult.Blocked ->
+                    KollectResult.Blocked(
+                            combineRequestMaps<I, A, F>(MF, first.rs, second.rs),
+                            first.cont.product<I, B>(MF, second.cont))
+                // second is KollectResult.Throw ->
+                else ->
+                    KollectResult.Throw((second as KollectResult.Throw).e)
+            }
+            MF.just(result)
+        })
+    }
 
     fun <B> flatMap(MF: Monad<F>, f: (A) -> Kind<KollectPartialOf<F>, B>): Kollect<F, B> = MF.run {
         Unkollect(run.flatMap {
