@@ -1,73 +1,53 @@
 package kollect
 
+import arrow.Kind
 import arrow.core.None
 import arrow.core.Option
+import arrow.core.Some
 import arrow.core.Tuple2
-import arrow.core.fix
-import arrow.core.functor
-import arrow.core.toT
 import arrow.data.NonEmptyList
-import arrow.data.nel
-import kollect.arrow.extensions.tupleLeft
+import arrow.effects.typeclasses.Concurrent
 
-typealias DataSourceName = String
-typealias DataSourceIdentity = Tuple2<DataSourceName, Any>
-
-sealed class ExecutionType
-object Sequential : ExecutionType()
-object Parallel : ExecutionType()
+sealed class BatchExecution
+object Sequentially : BatchExecution()
+object InParallel : BatchExecution()
 
 /**
- * A `DataSource` is the recipe for fetching a certain identity `I`, which yields
- * results of type `A`.
+ * A `DataSource` is the recipe for fetching a certain identity `I`, which yields results of type `A`.
  */
-interface DataSource<I : Any, A> {
+interface DataSource<I, A> {
 
     /**
-     * The name of the data source.
+     * Name given to the data source. Defaults to "KollectDataSource:${this.javaClass.simpleName}".
      */
-    fun name(): DataSourceName
+    fun name(): String = "KollectDataSource:${this.javaClass.simpleName}"
 
     /**
-     * Derive a `DataSourceIdentity` from an identity, suitable for storing the result
-     * of such identity in a `DataSourceCache`.
+     * Fetches a value from the source of data by its given Identity. Requires an instance of Concurrent.
+     *
+     * @param id for the fetched item I.
+     * @return IO<Option<A>> since this operation represents an IO computation that returns an optional result. In
+     * case the result is not found, it'll return None.
      */
-    fun identity(i: I): DataSourceIdentity = name() toT i
-
-    /**
-     * Fetch one identity, returning a None if it wasn't found.
-     */
-    fun fetchOne(id: I): Query<Option<A>>
+    fun <F> fetch(CF: Concurrent<F>, id: I): Kind<F, Option<A>>
 
     /**
      * Fetch many identities, returning a mapping from identities to results. If an
      * identity wasn't found, it won't appear in the keys.
      */
-    fun fetchMany(ids: NonEmptyList<I>): Query<Map<I, A>>
-
-    /**
-     * Use `fetchOne` for implementing of `fetchMany`. Use only when the data
-     * source doesn't support batching.
-     */
-    fun batchingNotSupported(ids: NonEmptyList<I>): Query<Map<I, A>> {
-        val fetchOneWithId: (I) -> Query<Option<Tuple2<I, A>>> = { id ->
-            fetchOne(id).map { Option.functor().tupleLeft(it, id).fix() }
-        }
-
-        return ids.traverse(Query.applicative(), fetchOneWithId)
-            .fix()
-            .map {
-                it.map { it.orNull() }.all
-                    .filterNotNull()
-                    .map { Pair(it.a, it.b) }.toMap()
-            }
+    fun <F> batch(CF: Concurrent<F>, ids: NonEmptyList<I>): Kind<F, Map<I, A>> = CF.binding {
+        val tuples = KollectExecution.parallel(
+                CF,
+                ids.map { id -> fetch(CF, id).map { v -> Tuple2(id, v) } }
+        ).bind()
+        val results: List<Tuple2<I, A>> = tuples.collect(
+                f = { Tuple2(it.a, (it.b as Some<A>).t) },
+                filter = { it.b is Some<A> }
+        )
+        results.associateBy({ it.a }, { it.b })
     }
-
-    fun batchingOnly(id: I): Query<Option<A>> =
-        fetchMany(id.nel()).map { Option.fromNullable(it[id]) }
 
     fun maxBatchSize(): Option<Int> = None
 
-    fun batchExecution(): ExecutionType = Parallel
+    fun batchExecution(): BatchExecution = InParallel
 }
-

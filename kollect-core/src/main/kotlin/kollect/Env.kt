@@ -1,36 +1,33 @@
 package kollect
 
 /**
- * An environment that is passed along during the fetch rounds. It holds the
- * cache and the list of rounds that have been executed.
+ * An environment that is passed along during the kollect rounds. It holds the cache and the list of rounds that have
+ * been executed.
  */
 interface Env {
     val rounds: List<Round>
-    val cache: DataSourceCache
-    fun evolve(newRound: Round, newCache: DataSourceCache): Env
+    fun evolve(newRound: Round): Env
 }
 
 /**
- * A data structure that holds information about a fetch round.
+ * A data structure that holds information about a request inside a kollect round.
  */
-data class Round(
-        val cache: DataSourceCache,
+data class Request(
         val request: KollectRequest,
-        val response: Any,
         val start: Long,
-        val end: Long) {
-    fun duration(): Double = (end - start) / 1e6
-}
+        val end: Long,
+        val duration: Long = end - start
+)
 
 /**
- * A concrete implementation of `Env` used in the default Fetch interpreter.
+ * A data structure that holds information about a kollect round.
  */
-data class KollectEnv(
-        override val cache: DataSourceCache,
-        override val rounds: List<Round> = emptyList()) : Env {
+data class Round(val queries: List<Request>)
 
-    override fun evolve(
-            newRound: Round,
-            newCache: DataSourceCache): KollectEnv =
-            copy(rounds = rounds + newRound, cache = newCache)
+/**
+ * A concrete implementation of `Env` used in the default Kollect interpreter.
+ */
+data class KollectEnv(override val rounds: List<Round> = listOf()) : Env {
+
+    override fun evolve(newRound: Round): KollectEnv = copy(rounds = rounds + newRound)
 }

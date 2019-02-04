@@ -1,45 +1,62 @@
 package kollect
 
+import arrow.Kind
 import arrow.core.Option
 import arrow.core.Tuple2
+import arrow.core.toOption
+import arrow.data.extensions.listk.foldable.foldM
+import arrow.data.k
+import arrow.typeclasses.Monad
+
+inline class DataSourceResult(val result: Any)
 
 /**
- * A `Cache` interface so the users of the library can provide their own cache.
+ *  Users of Kollect can provide their own cache by implementing this interface.
  */
-interface DataSourceCache {
+interface DataSourceCache<F> {
 
-    fun <A> update(k: DataSourceIdentity, v: A): DataSourceCache
+    fun <I : Any, A : Any> lookup(i: I, ds: DataSource<I, A>): Kind<F, Option<A>>
 
-    fun <A> get(k: DataSourceIdentity): Option<A>
+    fun <I : Any, A : Any> insert(i: I, v: A, ds: DataSource<I, A>): Kind<F, DataSourceCache<F>>
 
-    fun <I : Any, A> getWithDS(ds: DataSource<I, A>): (I) -> Option<A> = { id -> get(ds.identity(id)) }
-
-    fun <I : Any, A> cacheResults(results: Map<I, A>, ds: DataSource<I, A>): DataSourceCache {
-        val op: (DataSourceCache, Map.Entry<I, A>) -> DataSourceCache = { dsc, e ->
-            dsc.update(ds.identity(e.key), e.value)
-        }
-        return results.entries.fold(this, op)
+    fun <I : Any, A : Any> bulkInsert(
+            MF: Monad<F>,
+            vs: List<Tuple2<I, A>>,
+            ds: DataSource<I, A>): Kind<F, DataSourceCache<F>> = vs.k().foldM(MF, this) { cache, tuple ->
+        cache.insert(tuple.a, tuple.b, ds)
     }
-
-    fun <A> contains(k: DataSourceIdentity): Boolean = get<A>(k).isDefined()
 }
 
 /**
  * A cache that stores its elements in memory.
  */
-data class InMemoryCache(val state: Map<DataSourceIdentity, Any?>) : DataSourceCache {
+data class InMemoryCache<F>(
+        val MF: Monad<F>,
+        val state: Map<Tuple2<String, Any>, DataSourceResult>
+) : DataSourceCache<F>, Monad<F> by MF {
 
-    override fun <A> get(k: DataSourceIdentity): Option<A> =
-        Option.fromNullable(state[k] as A?)
-
-    override fun <A> update(k: DataSourceIdentity, v: A): DataSourceCache =
-        copy(state = state.plus(Pair(k, v)))
-
-    companion object {
-        fun empty(): InMemoryCache = InMemoryCache(emptyMap())
-
-        operator fun invoke(vararg results: Tuple2<DataSourceIdentity, Any?>): InMemoryCache =
-            InMemoryCache(results.fold(emptyMap(), { map, tuple2 -> map.plus(Pair(tuple2.a, tuple2.b)) }))
+    override fun <I : Any, A : Any> lookup(i: I, ds: DataSource<I, A>): Kind<F, Option<A>> = run {
+        just(state[Tuple2(ds.name(), i)].toOption().map { it.result as A })
     }
 
+    override fun <I : Any, A : Any> insert(i: I, v: A, ds: DataSource<I, A>): Kind<F, DataSourceCache<F>> = run {
+        just(copy(state = state.updated(Tuple2(ds.name(), i), DataSourceResult(v))))
+    }
+
+    companion object {
+
+        fun <F> empty(MF: Monad<F>): InMemoryCache<F> = InMemoryCache(MF, emptyMap())
+
+        operator fun <F, I : Any, A : Any> invoke(
+                MF: Monad<F>,
+                vararg results: Tuple2<Tuple2<String, I>, A>
+        ): InMemoryCache<F> = InMemoryCache(MF, results.fold(emptyMap()) { acc, tuple2 ->
+            val s = tuple2.a.a
+            val i = tuple2.a.b
+            val v = tuple2.b
+            acc.updated(Tuple2(s, i), DataSourceResult(v))
+        })
+    }
 }
+
+fun <K, V> Map<K, V>.updated(k: K, newVal: V) = this.filterNot { it.key == k } + mapOf(k to newVal)

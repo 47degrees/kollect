@@ -1,22 +1,28 @@
+test {
+    testLogging {
+        exceptionFormat 'full'
+        events "passed", "skipped", "failed", "standardOut", "standardError"
+    }
+}
+
 dependencies {
+    implementation project(':kollect-core')
     implementation project(':kollect-typeclasses')
+    implementation project(':kollect-extensions')
 
     implementation "org.jetbrains.kotlin:kotlin-stdlib-jdk8:$kotlinVersion"
 
     implementation "io.arrow-kt:arrow-core-data:$arrowVersion"
     implementation "io.arrow-kt:arrow-effects:$arrowVersion"
+    implementation "io.arrow-kt:arrow-effects-io-extensions:$arrowVersion"
 
     kapt "io.arrow-kt:arrow-annotations-processor:$arrowVersion"
 
     implementation "org.jetbrains.kotlinx:kotlinx-coroutines-core:$kotlinxCoroutinesVersion"
+
+    testCompile "io.kotlintest:kotlintest-runner-junit4:$kotlinTestVersion"
 }
 
 apply from: rootProject.file('gradle/gradle-mvn-push.gradle')
 apply from: rootProject.file('gradle/generated-kotlin-sources.gradle')
-
 apply plugin: 'kotlin-kapt'
-compileKotlin {
-    kotlinOptions {
-        freeCompilerArgs = ["-XXLanguage:+InlineClasses"]
-    }
-}

@@ -1,5 +1,6 @@
 dependencies {
     implementation project(':kollect-typeclasses')
+    implementation project(':kollect-core')
 
     implementation "org.jetbrains.kotlin:kotlin-stdlib-jdk8:$kotlinVersion"
 
@@ -13,10 +14,4 @@ dependencies {
 
 apply from: rootProject.file('gradle/gradle-mvn-push.gradle')
 apply from: rootProject.file('gradle/generated-kotlin-sources.gradle')
-
 apply plugin: 'kotlin-kapt'
-compileKotlin {
-    kotlinOptions {
-        freeCompilerArgs = ["-XXLanguage:+InlineClasses"]
-    }
-}
