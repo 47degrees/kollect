@@ -3,7 +3,6 @@
 package kollect
 
 import arrow.Kind
-import arrow.Kind2
 import arrow.core.*
 import arrow.data.NonEmptyList
 import arrow.effects.Promise
